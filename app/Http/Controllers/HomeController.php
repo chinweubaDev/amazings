@@ -50,7 +50,12 @@ class HomeController extends Controller
                 'away_logo' => $fixture->away_team_logo,
                 'prediction' => $predictionOutcome['prediction'],
                 'confidence' => $predictionOutcome['confidence'],
-                'prediction_color' => $this->getPredictionColor($predictionOutcome['prediction'], $predictionOutcome['confidence']),
+                'prediction_color' => $this->getPredictionColor(
+                        $predictionOutcome['prediction'], 
+                        $predictionOutcome['confidence'], 
+                        $fixture->goals_home, 
+                        $fixture->goals_away
+                    ),
                 'odds' => $matchWinnerOdds,
                 'avg_goals' => $avgGoals,
                 'status' => $fixture->status_long ?? 'Scheduled',
@@ -72,6 +77,257 @@ class HomeController extends Controller
         });
 
         return view('home', ['grouped' => $grouped]);
+    }
+  
+    public function showdouble()
+    {
+        $today = Carbon::today()->toDateString();
+
+        // Fetch today's fixtures with their relationships
+        $fixtures = Fixture::with(['league', 'odds'])
+            ->whereDate('date', $today)
+            ->orderBy('date', 'asc')
+            ->get();
+
+        // Transform fixtures into structured data for double chance predictions
+        $data = $fixtures->map(function ($fixture) {
+            // Parse JSON fields if they're stored as strings
+            $odds = is_array($fixture->odds) ? $fixture->odds : (json_decode($fixture->odds, true) ?? []);
+            $h2h = is_array($fixture->head2head) ? $fixture->head2head : (json_decode($fixture->head2head, true) ?? []);
+            $stats = is_array($fixture->statistics) ? $fixture->statistics : (json_decode($fixture->statistics, true) ?? []);
+            
+            // Get double chance specific prediction
+            $doubleChancePrediction = $this->predictDoubleChance($odds, $h2h, $fixture);
+
+            // Get double chance odds instead of match winner odds
+            $doubleChanceOdds = $this->getDoubleChanceOdds($fixture, $odds);
+
+            // Calculate average goals from H2H
+            $avgGoals = $this->calculateAverageGoals($h2h);
+
+            return [
+                'fixture_id' => $fixture->fixture_id,
+                'country' => $fixture->league_country ?? 'Unknown',
+                'league' => $fixture->league_name ?? 'Unknown League',
+                'country_flag' => $fixture->league_flag,
+                'league_logo' => $fixture->league_logo,
+                'league_id' => $fixture->league_id,
+                'match_date' => $fixture->date,
+                'match_time' => Carbon::parse($fixture->date)->format('H:i'),
+                'home_team' => $fixture->home_team_name ?? 'N/A',
+                'away_team' => $fixture->away_team_name ?? 'N/A',
+                'home_logo' => $fixture->home_team_logo,
+                'away_logo' => $fixture->away_team_logo,
+                'prediction' => $doubleChancePrediction['prediction'] ?? 'N/A',
+                'confidence' => $doubleChancePrediction['confidence'] ?? 0,
+                'prediction_color' => $this->getPredictionColor(
+                    $doubleChancePrediction['prediction'] ?? 'N/A', 
+                    $doubleChancePrediction['confidence'] ?? 0,
+                    $fixture->goals_home ?? null,
+                    $fixture->goals_away ?? null
+                ),
+                                'odds' => $doubleChanceOdds,
+                'avg_goals' => $avgGoals,
+                'status' => $fixture->status_long ?? 'Scheduled',
+                'status_short' => $fixture->status_short ?? 'NS',
+                'home_score' => $fixture->goals_home ?? null,
+                'away_score' => $fixture->goals_away ?? null,
+                'halftime_home' => $fixture->halftime_home ?? null,
+                'halftime_away' => $fixture->halftime_away ?? null,
+                'elapsed' => $fixture->elapsed ?? null,
+                'venue' => $fixture->venue_name ?? null,
+                'is_finished' => in_array($fixture->status_short ?? 'NS', ['FT', 'AET', 'PEN']),
+                'has_started' => !in_array($fixture->status_short ?? 'NS', ['NS', 'TBD', 'CANC', 'PST']),
+            ];
+        });
+
+        // Group by Country - League for organized display
+        $grouped = $data->groupBy(function ($item) {
+            return $item['country'] . ' - ' . $item['league'];
+        });
+
+        return view('doublechance', ['grouped' => $grouped]);
+    }
+
+    private function getDoubleChanceOdds($fixture, $odds)
+    {
+        // Try to get double chance odds from odds data
+        if (!empty($odds) && is_array($odds)) {
+            foreach ($odds as $oddsEntry) {
+                if (isset($oddsEntry['bookmakers']) && is_array($oddsEntry['bookmakers'])) {
+                    foreach ($oddsEntry['bookmakers'] as $bookmaker) {
+                        if (isset($bookmaker['bets']) && is_array($bookmaker['bets'])) {
+                            foreach ($bookmaker['bets'] as $bet) {
+                                if (isset($bet['name']) && $bet['name'] === 'Double Chance' && isset($bet['values'])) {
+                                    $oddsArray = ['home' => null, 'draw' => null, 'away' => null];
+                                    foreach ($bet['values'] as $value) {
+                                        switch ($value['value']) {
+                                            case '1X': // Home or Draw
+                                                $oddsArray['home'] = (float) $value['odd'];
+                                                break;
+                                            case 'X2': // Draw or Away
+                                                $oddsArray['draw'] = (float) $value['odd'];
+                                                break;
+                                            case '12': // Home or Away
+                                                $oddsArray['away'] = (float) $value['odd'];
+                                                break;
+                                        }
+                                    }
+                                    
+                                    if ($oddsArray['home'] !== null || $oddsArray['draw'] !== null || $oddsArray['away'] !== null) {
+                                        return $oddsArray;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Generate default double chance odds if none found
+        return $this->generateRandomDoubleChanceOdds();
+    }
+    public function htft()
+    {
+        $today = Carbon::today()->toDateString();
+    
+        // Fetch today's fixtures with their relationships
+        $fixtures = Fixture::with(['league', 'odds'])
+            ->whereDate('date', $today)
+            ->orderBy('date', 'asc')
+            ->get();
+    
+        // Transform fixtures into structured data for halftime/fulltime predictions
+        $data = $fixtures->map(function ($fixture) {
+            // Parse JSON fields if they're stored as strings
+            $odds = is_array($fixture->odds) ? $fixture->odds : (json_decode($fixture->odds, true) ?? []);
+            $h2h = is_array($fixture->head2head) ? $fixture->head2head : (json_decode($fixture->head2head, true) ?? []);
+            $stats = is_array($fixture->statistics) ? $fixture->statistics : (json_decode($fixture->statistics, true) ?? []);
+            
+            // Get halftime/fulltime specific prediction
+            $htftPrediction = $this->predictHalftimeFulltime($odds, $h2h, $fixture);
+    
+            // Get halftime/fulltime odds instead of match winner odds
+            $htftOdds = $this->getHalftimeFulltimeOdds($fixture, $odds);
+    
+            // Calculate average goals from H2H
+            $avgGoals = $this->calculateAverageGoals($h2h);
+    
+            return [
+                'fixture_id' => $fixture->fixture_id,
+                'country' => $fixture->league_country ?? 'Unknown',
+                'league' => $fixture->league_name ?? 'Unknown League',
+                'country_flag' => $fixture->league_flag,
+                'league_logo' => $fixture->league_logo,
+                'league_id' => $fixture->league_id,
+                'match_date' => $fixture->date,
+                'match_time' => Carbon::parse($fixture->date)->format('H:i'),
+                'home_team' => $fixture->home_team_name ?? 'N/A',
+                'away_team' => $fixture->away_team_name ?? 'N/A',
+                'home_logo' => $fixture->home_team_logo,
+                'away_logo' => $fixture->away_team_logo,
+                'prediction' => $htftPrediction['prediction'] ?? 'N/A',
+                'confidence' => $htftPrediction['confidence'] ?? 0,
+                'prediction_color' => $this->getPredictionColor(
+                    $htftPrediction['prediction'] ?? 'N/A', 
+                    $htftPrediction['confidence'] ?? 0,
+                    $fixture->goals_home ?? null,
+                    $fixture->goals_away ?? null
+                ),
+                'odds' => $htftOdds,
+                'avg_goals' => $avgGoals,
+                'status' => $fixture->status_long ?? 'Scheduled',
+                'status_short' => $fixture->status_short ?? 'NS',
+                'home_score' => $fixture->goals_home ?? null,
+                'away_score' => $fixture->goals_away ?? null,
+                'halftime_home' => $fixture->halftime_home ?? null,
+                'halftime_away' => $fixture->halftime_away ?? null,
+                'elapsed' => $fixture->elapsed ?? null,
+                'venue' => $fixture->venue_name ?? null,
+                'is_finished' => in_array($fixture->status_short ?? 'NS', ['FT', 'AET', 'PEN']),
+                'has_started' => !in_array($fixture->status_short ?? 'NS', ['NS', 'TBD', 'CANC', 'PST']),
+            ];
+        });
+    
+        // Group by Country - League for organized display
+        $grouped = $data->groupBy(function ($item) {
+            return $item['country'] . ' - ' . $item['league'];
+        });
+    
+        return view('htft', ['grouped' => $grouped]);
+    }
+    
+    // Add this new method to get halftime/fulltime odds specifically
+    private function getHalftimeFulltimeOdds($fixture, $odds)
+    {
+        // Try to get halftime/fulltime odds from odds data
+        if (!empty($odds) && is_array($odds)) {
+            foreach ($odds as $oddsEntry) {
+                if (isset($oddsEntry['bookmakers']) && is_array($oddsEntry['bookmakers'])) {
+                    foreach ($oddsEntry['bookmakers'] as $bookmaker) {
+                        if (isset($bookmaker['bets']) && is_array($bookmaker['bets'])) {
+                            foreach ($bookmaker['bets'] as $bet) {
+                                if (isset($bet['name']) && $bet['name'] === 'HT/FT Double"' && isset($bet['values'])) {
+                                    $oddsArray = ['home' => null, 'draw' => null, 'away' => null];
+                                    foreach ($bet['values'] as $value) {
+                                        switch ($value['value']) {
+                                            case 'Home/Home': // Home/Home
+                                                $oddsArray['home'] = (float) $value['odd'];
+                                                break;
+                                            case 'Draw/Draw': // Draw/Draw
+                                                $oddsArray['draw'] = (float) $value['odd'];
+                                                break;
+                                            case 'Away/Away': // Away/Away
+                                                $oddsArray['away'] = (float) $value['odd'];
+                                                break;
+                                            case 'Home/Draw': // Home/Draw
+                                                $oddsArray['home'] = (float) $value['odd'];
+                                                break;
+                                            case 'Draw/Away': // Draw/Away
+                                                $oddsArray['draw'] = (float) $value['odd'];
+                                                break;
+                                            case 'Away/Home': // Away/Home
+                                                $oddsArray['away'] = (float) $value['odd'];
+                                                break;
+
+
+                                        }
+                                    }
+                                    
+                                    if ($oddsArray['home'] !== null || $oddsArray['draw'] !== null || $oddsArray['away'] !== null) {
+                                        return $oddsArray;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    
+        // Generate default halftime/fulltime odds if none found
+        return $this->generateRandomHtftOdds();
+    }
+    
+    // Add this method to generate random halftime/fulltime odds
+    private function generateRandomHtftOdds()
+    {
+        // HT/FT odds are typically higher than regular match winner odds
+        return [
+            'home' => rand(300, 800) / 100, // 1/1 odds (3.00 to 8.00)
+            'draw' => rand(600, 1500) / 100, // X/X odds (6.00 to 15.00)
+            'away' => rand(300, 800) / 100, // 2/2 odds (3.00 to 8.00)
+        ];
+    }
+    private function generateRandomDoubleChanceOdds()
+    {
+        // Double chance odds are typically lower than match winner odds
+        return [
+            'home' => rand(110, 150) / 100, // 1X odds (1.10 to 1.50)
+            'draw' => rand(110, 150) / 100, // X2 odds (1.10 to 1.50)
+            'away' => rand(110, 150) / 100, // 12 odds (1.10 to 1.50)
+        ];
     }
 
     private function predictFixture($fixture, $odds, $h2h, $stats)
@@ -153,9 +409,7 @@ class HomeController extends Controller
         ];
     }
 
-    /**
-     * Map API prediction values to display format
-     */
+   
     private function mapPredictionToDisplay($prediction)
     {
         switch ($prediction) {
@@ -291,6 +545,7 @@ class HomeController extends Controller
         return $this->generateRandomOdds();
     }
 
+  
     /**
      * Generate random realistic betting odds
      */
@@ -336,20 +591,149 @@ class HomeController extends Controller
         return $matchCount > 0 ? round($totalGoals / $matchCount, 2) : null;
     }
 
+
     /**
      * Get prediction color based on confidence
      */
-    private function getPredictionColor($prediction, $confidence)
+  /**
+ * Get prediction color based on confidence
+ */
+private function getPredictionColor($prediction, $confidence, $homeScore = null, $awayScore = null, $halftimeHome = null, $halftimeAway = null)
+{
+    // If no scores available (match not started/finished), use orange as default
+    if ($homeScore === null || $awayScore === null) {
+        return 'orange'; // Default color for unfinished matches
+    }
+    
+    // Convert scores to integers for comparison
+    $homeScore = (int) $homeScore;
+    $awayScore = (int) $awayScore;
+    $halftimeHome = (int) ($halftimeHome ?? 0);
+    $halftimeAway = (int) ($halftimeAway ?? 0);
+    
+    // Determine actual match outcome
+    $actualOutcome = '';
+    if ($homeScore > $awayScore) {
+        $actualOutcome = '1'; // Home win
+    } elseif ($homeScore < $awayScore) {
+        $actualOutcome = '2'; // Away win
+    } else {
+        $actualOutcome = 'X'; // Draw
+    }
+    
+    // Check if prediction matches actual outcome
+    $predictionCorrect = false;
+    
+    switch (strtoupper($prediction)) {
+        case '1':
+        case 'HOME':
+            $predictionCorrect = ($actualOutcome === '1');
+            break;
+            
+        case '2':
+        case 'AWAY':
+            $predictionCorrect = ($actualOutcome === '2');
+            break;
+            
+        case 'X':
+        case 'DRAW':
+            $predictionCorrect = ($actualOutcome === 'X');
+            break;
+            
+        // Double chance predictions
+        case '1X':
+            $predictionCorrect = ($actualOutcome === '1' || $actualOutcome === 'X');
+            break;
+            
+        case 'X2':
+            $predictionCorrect = ($actualOutcome === 'X' || $actualOutcome === '2');
+            break;
+            
+        case '12':
+            $predictionCorrect = ($actualOutcome === '1' || $actualOutcome === '2');
+            break;
+            
+        // BTTS predictions
+        case 'YES':
+        case 'BOTH TEAMS TO SCORE':
+            $predictionCorrect = ($homeScore > 0 && $awayScore > 0);
+            break;
+            
+        case 'NO':
+        case 'NO BTTS':
+            $predictionCorrect = ($homeScore === 0 || $awayScore === 0);
+            break;
+            
+        // Over/Under 2.5 predictions
+        case 'OVER 2.5':
+        case 'OVER':
+            $predictionCorrect = (($homeScore + $awayScore) > 2.5);
+            break;
+            
+        case 'UNDER 2.5':
+        case 'UNDER':
+            $predictionCorrect = (($homeScore + $awayScore) < 2.5);
+            break;
+            
+        // Halftime/Fulltime predictions
+        case '1/1':
+            $predictionCorrect = ($actualOutcome === '1' && $halftimeHome > $halftimeAway);
+            break;
+            
+        case 'X/X':
+            $predictionCorrect = ($actualOutcome === 'X' && $halftimeHome == $halftimeAway);
+            break;
+            
+        case '2/2':
+            $predictionCorrect = ($actualOutcome === '2' && $halftimeAway > $halftimeHome);
+            break;
+            
+        case '1/X':
+            $predictionCorrect = ($actualOutcome === 'X' && $halftimeHome > $halftimeAway);
+            break;
+            
+        case 'X/1':
+            $predictionCorrect = ($actualOutcome === '1' && $halftimeHome == $halftimeAway);
+            break;
+            
+        case '1/2':
+            $predictionCorrect = ($actualOutcome === '2' && $halftimeHome > $halftimeAway);
+            break;
+            
+        case '2/1':
+            $predictionCorrect = ($actualOutcome === '1' && $halftimeAway > $halftimeHome);
+            break;
+            
+        case 'X/2':
+            $predictionCorrect = ($actualOutcome === '2' && $halftimeHome == $halftimeAway);
+            break;
+            
+        case '2/X':
+            $predictionCorrect = ($actualOutcome === 'X' && $halftimeAway > $halftimeHome);
+            break;
+            
+        default:
+            // For other prediction types, fall back to confidence-based coloring
+            return $this->getConfidenceBasedColor($confidence);
+    }
+    
+    // Return color based on prediction accuracy
+    return $predictionCorrect ? 'green' : 'red';
+}
+    
+    /**
+     * Fallback method for confidence-based coloring
+     */
+    private function getConfidenceBasedColor($confidence)
     {
         if ($confidence >= 70) {
-            return 'green'; // High confidence - green background
+            return 'yellow'; // High confidence - yellow for unverified predictions
         } elseif ($confidence >= 50) {
-            return 'white'; // Medium confidence - white background with border
+            return 'white'; // Medium confidence - white background
         } else {
-            return 'red'; // Low confidence - red border
+            return 'orange'; // Low confidence - orange
         }
     }
-
     /**
      * Show match winner predictions for today's fixtures
      */
@@ -655,74 +1039,7 @@ class HomeController extends Controller
         return view('overunder25', ['grouped' => $groupedData]);
     }
 
-    /**
-     * Show halftime/fulltime predictions for today's fixtures
-     */
-    public function showhtft()
-    {
-        $today = Carbon::today()->toDateString();
-
-        $fixtures = Fixture::whereDate('date', $today)
-            ->where('has_odds', false)
-            ->orderBy('date', 'asc')
-            ->get();
-
-        $htftData = $fixtures->map(function ($fixture) {
-            $teams = is_array($fixture->teams) ? $fixture->teams : (json_decode($fixture->teams, true) ?? []);
-            $odds = is_array($fixture->odds) ? $fixture->odds : (json_decode($fixture->odds, true) ?? []);
-            $h2h = is_array($fixture->head2head) ? $fixture->head2head : (json_decode($fixture->head2head, true) ?? []);
-            $stats = is_array($fixture->statistics) ? $fixture->statistics : (json_decode($fixture->statistics, true) ?? []);
-            
-            $htftPrediction = $this->predictHalftimeFulltime($odds, $h2h, $fixture);
-            
-            $htftOdds = collect($odds)
-                ->pluck('bookmakers')
-                ->flatten(1)
-                ->pluck('bets')
-                ->flatten(1)
-                ->firstWhere('name', 'Halftime/Fulltime');
-            
-            $availableOdds = [];
-            if ($htftOdds && isset($htftOdds['values'])) {
-                foreach ($htftOdds['values'] as $v) {
-                    $availableOdds[$v['value']] = $v['odd'];
-                }
-            }
-
-            $homeWins = $this->countH2HWins($h2h, $fixture->home_team_id);
-            $awayWins = $this->countH2HWins($h2h, $fixture->away_team_id);
-            $totalH2H = count($h2h);
-            $draws = $totalH2H - $homeWins - $awayWins;
-
-            return [
-                'fixture_id' => $fixture->fixture_id,
-                'country' => $fixture->country_name,
-                'league' => $fixture->league_name,
-                'country_flag' => $fixture->country_flag,
-                'match_date' => $fixture->date,
-                'home_team' => $fixture->home_team_name ?? 'N/A',
-                'away_team' => $fixture->away_team_name ?? 'N/A',
-                'home_logo' => $teams['home']['logo'] ?? null,
-                'away_logo' => $teams['away']['logo'] ?? null,
-                'prediction' => $htftPrediction['prediction'],
-                'confidence' => $htftPrediction['confidence'],
-                'predicted_odd' => $htftPrediction['odd'],
-                'available_odds' => $availableOdds,
-                'h2h_stats' => [
-                    'home_wins' => $homeWins,
-                    'away_wins' => $awayWins,
-                    'draws' => $draws,
-                    'total_matches' => $totalH2H
-                ]
-            ];
-        });
-
-        $groupedData = $htftData->groupBy(function ($item) {
-            return $item['country'] . ' - ' . $item['league'];
-        });
-
-        return view('htft', ['grouped' => $groupedData]);
-    }
+  
 
     /**
      * Get comprehensive predictions for all betting markets
@@ -874,65 +1191,268 @@ class HomeController extends Controller
      */
     private function predictHalftimeFulltime($odds, $h2h, $fixture)
     {
+        // Generate H2H data if missing
+        if (empty($h2h) || !is_array($h2h)) {
+            $h2h = $this->generateRealisticH2H($fixture);
+        }
+    
+        // Try to find HT/FT odds from various possible names
         $htft = collect($odds)
             ->pluck('bookmakers')
             ->flatten(1)
             ->pluck('bets')
             ->flatten(1)
-            ->firstWhere('name', 'Halftime/Fulltime');
-
+            ->first(function($bet) {
+                $name = strtolower($bet['name'] ?? '');
+                return in_array($name, ['ht/ft double', 'halftime/fulltime', 'half time/full time', 'ht ft']);
+            });
+    
+        // Generate HT/FT odds if not found
         if (!$htft || !isset($htft['values'])) {
-            return ['prediction' => '1/1', 'confidence' => 45, 'odd' => null];
+            $htft = $this->generateRealisticHtftOdds();
         }
-
+    
         $weighted = [];
         foreach ($htft['values'] as $v) {
             $odd = (float) $v['odd'];
-            $weighted[$v['value']] = 1 / $odd;
-        }
-
-        // Favor consistent results (1/1, X/X, 2/2)
-        $consistentResults = ['1/1', 'X/X', '2/2'];
-        foreach ($consistentResults as $result) {
-            if (isset($weighted[$result])) {
-                $weighted[$result] *= 1.3;
+            if ($odd > 0) { // Ensure valid odds
+                $weighted[$v['value']] = 1 / $odd;
             }
         }
-
-        $homeWins = $this->countH2HWins($h2h, $fixture->home_team_id);
-        $awayWins = $this->countH2HWins($h2h, $fixture->away_team_id);
-
-        if ($homeWins > $awayWins) {
-            $homeResults = ['1/1', '1/X', '1/2'];
+    
+        // If no weighted data, create default weights
+        if (empty($weighted)) {
+            $weighted = [
+                '1/1' => 0.25, '1/X' => 0.08, '1/2' => 0.05,
+                'X/1' => 0.12, 'X/X' => 0.15, 'X/2' => 0.08,
+                '2/1' => 0.05, '2/X' => 0.07, '2/2' => 0.15
+            ];
+        }
+    
+        // Enhanced prediction logic based on team analysis
+        $analysis = $this->analyzeTeamStrengths($h2h, $fixture);
+        
+        // Apply team strength weighting
+        if ($analysis['home_stronger']) {
+            // Favor home-winning scenarios
+            $homeResults = ['1/1', '1/X', 'X/1'];
             foreach ($homeResults as $result) {
                 if (isset($weighted[$result])) {
-                    $weighted[$result] *= 1.2;
+                    $weighted[$result] *= (1.2 + ($analysis['strength_diff'] * 0.3));
                 }
             }
-        } elseif ($awayWins > $homeWins) {
-            $awayResults = ['2/2', '2/X', '2/1'];
+        } elseif ($analysis['away_stronger']) {
+            // Favor away-winning scenarios
+            $awayResults = ['2/2', '2/X', 'X/2'];
             foreach ($awayResults as $result) {
                 if (isset($weighted[$result])) {
-                    $weighted[$result] *= 1.2;
+                    $weighted[$result] *= (1.2 + ($analysis['strength_diff'] * 0.3));
+                }
+            }
+        } else {
+            // Balanced teams - favor draw scenarios and consistent results
+            $balancedResults = ['X/X', '1/1', '2/2', 'X/1', 'X/2'];
+            foreach ($balancedResults as $result) {
+                if (isset($weighted[$result])) {
+                    $weighted[$result] *= 1.15;
                 }
             }
         }
-
+    
+        // Apply league-based adjustments
+        $leagueAdjustments = $this->getLeagueCharacteristics($fixture->league_name ?? '');
+        foreach ($leagueAdjustments as $result => $multiplier) {
+            if (isset($weighted[$result])) {
+                $weighted[$result] *= $multiplier;
+            }
+        }
+    
+        // Historical pattern analysis
+        $htftPattern = $this->analyzeHtftPatterns($h2h);
+        foreach ($htftPattern as $pattern => $frequency) {
+            if (isset($weighted[$pattern]) && $frequency > 0.3) {
+                $weighted[$pattern] *= (1 + $frequency);
+            }
+        }
+    
+        // Make prediction
         $prediction = $this->weightedRandom($weighted);
+        
+        // Find corresponding odd value
         $oddValue = null;
-
         foreach ($htft['values'] as $val) {
             if ($val['value'] === $prediction) {
                 $oddValue = $val['odd'];
                 break;
             }
         }
-
+    
+        // Calculate confidence based on analysis strength
+        $confidence = $this->calculateHtftConfidence($analysis, $htftPattern, $weighted[$prediction] ?? 0.1);
+    
         return [
             'prediction' => $prediction,
-            'confidence' => rand(40, 70),
+            'confidence' => $confidence,
             'odd' => $oddValue
         ];
+    }
+    
+    // Helper method to analyze team strengths
+    private function analyzeTeamStrengths($h2h, $fixture)
+    {
+        $homeWins = $this->countH2HWins($h2h, $fixture->home_team_id ?? 0);
+        $awayWins = $this->countH2HWins($h2h, $fixture->away_team_id ?? 0);
+        $totalMatches = count($h2h);
+        $draws = $totalMatches - $homeWins - $awayWins;
+    
+        $homeWinRate = $totalMatches > 0 ? $homeWins / $totalMatches : 0.33;
+        $awayWinRate = $totalMatches > 0 ? $awayWins / $totalMatches : 0.33;
+        
+        $strengthDiff = abs($homeWinRate - $awayWinRate);
+        
+        return [
+            'home_stronger' => $homeWinRate > $awayWinRate && $strengthDiff > 0.2,
+            'away_stronger' => $awayWinRate > $homeWinRate && $strengthDiff > 0.2,
+            'balanced' => $strengthDiff <= 0.2,
+            'strength_diff' => $strengthDiff,
+            'home_win_rate' => $homeWinRate,
+            'away_win_rate' => $awayWinRate
+        ];
+    }
+    
+    // Helper method to get league characteristics
+    private function getLeagueCharacteristics($leagueName)
+    {
+        $leagueName = strtolower($leagueName);
+        
+        // Different leagues have different characteristics
+        if (strpos($leagueName, 'premier') !== false || strpos($leagueName, 'bundesliga') !== false) {
+            // High-scoring, attacking leagues
+            return ['1/1' => 1.1, '2/2' => 1.1, '1/2' => 1.05, '2/1' => 1.05];
+        } elseif (strpos($leagueName, 'serie a') !== false || strpos($leagueName, 'ligue 1') !== false) {
+            // More tactical, defensive leagues
+            return ['X/X' => 1.15, '1/X' => 1.1, 'X/2' => 1.1, 'X/1' => 1.1];
+        } elseif (strpos($leagueName, 'la liga') !== false) {
+            // Balanced but home advantage
+            return ['1/1' => 1.1, 'X/1' => 1.05, '1/X' => 1.05];
+        } else {
+            // Default balanced approach
+            return ['1/1' => 1.05, 'X/X' => 1.05, '2/2' => 1.05];
+        }
+    }
+    
+    // Helper method to analyze HT/FT patterns from H2H
+    private function analyzeHtftPatterns($h2h)
+    {
+        $patterns = [
+            '1/1' => 0, '1/X' => 0, '1/2' => 0,
+            'X/1' => 0, 'X/X' => 0, 'X/2' => 0,
+            '2/1' => 0, '2/X' => 0, '2/2' => 0
+        ];
+        
+        foreach ($h2h as $match) {
+            $htHome = $match['score']['halftime']['home'] ?? rand(0, 2);
+            $htAway = $match['score']['halftime']['away'] ?? rand(0, 2);
+            $ftHome = $match['goals']['home'] ?? rand(0, 3);
+            $ftAway = $match['goals']['away'] ?? rand(0, 3);
+            
+            // Determine HT result
+            $htResult = $htHome > $htAway ? '1' : ($htHome < $htAway ? '2' : 'X');
+            // Determine FT result
+            $ftResult = $ftHome > $ftAway ? '1' : ($ftHome < $ftAway ? '2' : 'X');
+            
+            $pattern = $htResult . '/' . $ftResult;
+            if (isset($patterns[$pattern])) {
+                $patterns[$pattern]++;
+            }
+        }
+        
+        // Convert counts to frequencies
+        $totalMatches = count($h2h);
+        if ($totalMatches > 0) {
+            foreach ($patterns as $pattern => $count) {
+                $patterns[$pattern] = $count / $totalMatches;
+            }
+        }
+        
+        return $patterns;
+    }
+    
+    // Helper method to generate realistic H2H data
+    private function generateRealisticH2H($fixture)
+    {
+        $h2h = [];
+        $matchCount = rand(3, 8); // Generate 3-8 historical matches
+        
+        for ($i = 0; $i < $matchCount; $i++) {
+            // Generate realistic scorelines
+            $homeGoals = $this->generateRealisticScore();
+            $awayGoals = $this->generateRealisticScore();
+            $htHome = min($homeGoals, rand(0, 2));
+            $htAway = min($awayGoals, rand(0, 2));
+            
+            $h2h[] = [
+                'teams' => [
+                    'home' => ['id' => $fixture->home_team_id ?? 1, 'winner' => $homeGoals > $awayGoals],
+                    'away' => ['id' => $fixture->away_team_id ?? 2, 'winner' => $awayGoals > $homeGoals]
+                ],
+                'goals' => ['home' => $homeGoals, 'away' => $awayGoals],
+                'score' => [
+                    'halftime' => ['home' => $htHome, 'away' => $htAway],
+                    'fulltime' => ['home' => $homeGoals, 'away' => $awayGoals]
+                ]
+            ];
+        }
+        
+        return $h2h;
+    }
+    
+    // Helper method to generate realistic HT/FT odds
+    private function generateRealisticHtftOdds()
+    {
+        return [
+            'values' => [
+                ['value' => '1/1', 'odd' => rand(350, 600) / 100],  // 3.50 - 6.00
+                ['value' => '1/X', 'odd' => rand(800, 1500) / 100], // 8.00 - 15.00
+                ['value' => '1/2', 'odd' => rand(1500, 3000) / 100], // 15.00 - 30.00
+                ['value' => 'X/1', 'odd' => rand(600, 1200) / 100], // 6.00 - 12.00
+                ['value' => 'X/X', 'odd' => rand(800, 1800) / 100], // 8.00 - 18.00
+                ['value' => 'X/2', 'odd' => rand(800, 1500) / 100], // 8.00 - 15.00
+                ['value' => '2/1', 'odd' => rand(1500, 3000) / 100], // 15.00 - 30.00
+                ['value' => '2/X', 'odd' => rand(1200, 2500) / 100], // 12.00 - 25.00
+                ['value' => '2/2', 'odd' => rand(350, 600) / 100],  // 3.50 - 6.00
+            ]
+        ];
+    }
+    
+    // Helper method to generate realistic score
+    private function generateRealisticScore()
+    {
+        $weights = [0 => 25, 1 => 35, 2 => 20, 3 => 12, 4 => 5, 5 => 2, 6 => 1];
+        return $this->weightedRandom($weights);
+    }
+    
+    // Helper method to calculate confidence based on analysis
+    private function calculateHtftConfidence($analysis, $patterns, $predictionWeight)
+    {
+        $baseConfidence = 45;
+        
+        // Increase confidence based on team strength difference
+        if ($analysis['home_stronger'] || $analysis['away_stronger']) {
+            $baseConfidence += ($analysis['strength_diff'] * 20);
+        }
+        
+        // Increase confidence based on historical pattern strength
+        $maxPattern = max($patterns);
+        if ($maxPattern > 0.3) {
+            $baseConfidence += ($maxPattern * 15);
+        }
+        
+        // Increase confidence based on prediction weight
+        $baseConfidence += ($predictionWeight * 10);
+        
+        // Ensure confidence is within reasonable bounds
+        return min(85, max(40, (int) $baseConfidence));
     }
 
     /**
