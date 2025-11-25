@@ -1,197 +1,366 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Over/Under 2.5 Goals Predictions</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
-    <style>
-        body { background-color: #f8f9fa; }
-        .card-header img { border-radius: 4px; }
-        table img { vertical-align: middle; }
-        th, td { vertical-align: middle !important; }
-        .prediction-badge { font-weight: bold; padding: 8px 12px; border-radius: 20px; }
-        .prediction-over { background-color: #fd7e14; color: white; }
-        .prediction-under { background-color: #6610f2; color: white; }
-        .confidence-high { color: #28a745; font-weight: bold; }
-        .confidence-medium { color: #ffc107; font-weight: bold; }
-        .confidence-low { color: #dc3545; font-weight: bold; }
-        .goals-stats { font-size: 0.85em; }
-        .odds-section { background-color: #f8f9fa; padding: 8px; border-radius: 6px; }
-    </style>
-</head>
-<body>
-<div class="container py-4">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2 class="text-primary fw-bold">🥅 Over/Under 2.5 Goals Predictions</h2>
-        <a href="{{ route('home') }}" class="btn btn-outline-primary">
-            <i class="bi bi-arrow-left"></i> Back to Home
-        </a>
-    </div>
+@extends('layouts.masters')
 
-    @if(isset($grouped) && count($grouped) > 0)
-        @foreach ($grouped as $groupName => $fixtures)
-            <div class="card mb-4 shadow-sm">
-                <div class="card-header bg-dark text-white d-flex align-items-center">
-                    @if(!empty($fixtures[0]['country_flag']))
-                        <img src="{{ $fixtures[0]['country_flag'] }}" width="30" height="20" class="me-2" alt="Flag">
-                    @endif
-                    <strong>{{ $groupName }}</strong>
-                    <span class="badge bg-secondary ms-2">{{ count($fixtures) }} matches</span>
-                </div>
+@push('styles')
+<style>
+    .card-header img { border-radius: 4px; }
+    table img { vertical-align: middle; }
+    th, td { vertical-align: middle !important; }
+    .prediction-green { background-color: #28a745; color: white; padding: 5px 10px; border-radius: 6px; font-weight: bold; }
+    .prediction-white { background-color: white; border: 1px solid #dc3545; color: #dc3545; padding: 5px 10px; border-radius: 6px; font-weight: bold; }
+    .prediction-red { background-color: #dc3545; color: white; padding: 5px 10px; border-radius: 6px; font-weight: bold; }
+    .odds-highlight { font-weight: bold; border: 2px solid #000; }
 
-                <div class="card-body p-0">
-                    <table class="table table-striped mb-0">
-                        <thead class="table-light">
-                        <tr>
-                            <th>Time</th>
-                            <th class="text-end">Home Team</th>
-                            <th></th>
-                            <th class="text-start">Away Team</th>
-                            <th>O/U 2.5 Prediction</th>
-                            <th>Confidence</th>
-                            <th>Predicted Odds</th>
-                            <th>Goals Stats</th>
-                            <th>All Odds</th>
-                        </tr>
-                        </thead>
-                        <tbody>
-                        @foreach ($fixtures as $f)
-                            <tr>
-                                <td class="fw-bold">
-                                    {{ \Carbon\Carbon::parse($f['match_date'])->format('H:i') }}
-                                </td>
+    .match-container {
+        width: 100%;
+        max-width: 1200px;
+        margin: auto;
+        font-family: Arial, sans-serif;
+    }
 
-                                <td class="text-end">
-                                    <div class="d-flex align-items-center justify-content-end">
-                                        <span class="me-2">{{ $f['home_team'] ?? 'Home Team' }}</span>
-                                        @if(!empty($f['home_logo']))
-                                            <img src="{{ $f['home_logo'] }}" width="25" height="25" alt="Home">
-                                        @endif
-                                    </div>
-                                </td>
+    .league-header {
+        background: #edf5ff;
+        padding: 12px 15px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 14px;
+        font-weight: bold;
+        border-top: 1px solid #ccc;
+    }
 
-                                <td class="text-center fw-bold text-muted">vs</td>
+    .league-header img.flag {
+        width: 26px;
+        height: 20px;
+    }
 
-                                <td class="text-start">
-                                    <div class="d-flex align-items-center">
-                                        @if(!empty($f['away_logo']))
-                                            <img src="{{ $f['away_logo'] }}" width="25" height="25" class="me-2" alt="Away">
-                                        @endif
-                                        <span>{{ $f['away_team'] ?? 'Away Team' }}</span>
-                                    </div>
-                                </td>
+    .standings {
+        margin-left: auto;
+        font-size: 13px;
+        color: #0044aa;
+        font-weight: 600;
+        cursor: pointer;
+    }
 
-                                <td>
-                                    @php
-                                        $predictionClass = strpos($f['prediction'], 'Over') !== false ? 'prediction-over' : 'prediction-under';
-                                    @endphp
-                                    <span class="prediction-badge {{ $predictionClass }}">
-                                        {{ $f['prediction'] ?? '—' }}
-                                    </span>
-                                </td>
+    .match-row {
+        display: grid;
+        grid-template-columns: 2fr 1.4fr 0.7fr 1.2fr 0.8fr 0.3fr;
+        align-items: center;
+        padding: 10px 15px;
+        border-bottom: 1px solid #e8e8e8;
+        background: #fff;
+    }
 
-                                <td>
-                                    @php
-                                        $confidence = $f['confidence'] ?? 0;
-                                        $confidenceClass = 'confidence-low';
-                                        if($confidence >= 70) $confidenceClass = 'confidence-high';
-                                        elseif($confidence >= 55) $confidenceClass = 'confidence-medium';
-                                    @endphp
-                                    <span class="{{ $confidenceClass }}">
-                                        {{ $confidence }}%
-                                    </span>
-                                </td>
+    .match-teams .team-name {
+        font-size: 13px;
+        font-weight: 600;
+        margin-bottom: 2px;
+    }
 
-                                <td>
-                                    @if($f['predicted_odd'])
-                                        <span class="badge bg-success">{{ $f['predicted_odd'] }}</span>
-                                    @else
-                                        <span class="text-muted">—</span>
-                                    @endif
-                                </td>
+    .match-date {
+        font-size: 14px;
+        color: #666;
+        margin-top: 5px;
+    }
 
-                                <td>
-                                    @if(isset($f['goals_stats']) && $f['goals_stats']['total_matches'] > 0)
-                                        <div class="goals-stats">
-                                            <div><small><strong>Over:</strong> {{ $f['goals_stats']['over_count'] }}/{{ $f['goals_stats']['total_matches'] }}</small></div>
-                                            <div><small><strong>Rate:</strong> {{ $f['goals_stats']['over_percentage'] }}%</small></div>
-                                            <div><small><strong>Avg:</strong> {{ $f['goals_stats']['avg_goals'] }} goals</small></div>
-                                        </div>
-                                    @else
-                                        <small class="text-muted">No stats</small>
-                                    @endif
-                                </td>
+    .team-logos {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 5px;
+    }
 
-                                <td>
-                                    @if(!empty($f['available_odds']) && is_array($f['available_odds']))
-                                        <div class="odds-section">
-                                            @foreach($f['available_odds'] as $outcome => $odd)
-                                                <div class="d-flex justify-content-between">
-                                                    <small><strong>{{ $outcome }}:</strong></small>
-                                                    <small>{{ $odd }}</small>
-                                                </div>
-                                            @endforeach
-                                        </div>
-                                    @else
-                                        <small class="text-muted">No odds</small>
-                                    @endif
-                                </td>
-                            </tr>
-                        @endforeach
-                        </tbody>
-                    </table>
+    .team-logo {
+        width: 20px;
+        height: 20px;
+        object-fit: contain;
+    }
+
+    .odds {
+        display: flex;
+        gap: 8px;
+    }
+
+    .odd-box {
+        padding: 6px 10px;
+        border: 1px solid #aaa;
+        border-radius: 6px;
+        font-weight: 600;
+        font-size: 14px;
+        min-width: 45px;
+        text-align: center;
+        background: #f8f9fa;
+    }
+
+    .odd-box.highlight {
+        border-color: #28a745;
+        background-color: #d4edda;
+        font-weight: bold;
+    }
+
+    .avg {
+        font-size: 16px;
+        font-weight: 600;
+        text-align: center;
+    }
+
+    .prediction {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .pred-tag {
+        padding: 5px 10px;
+        border-radius: 6px;
+        font-size: 14px;
+        font-weight: bold;
+        min-width: 30px;
+        text-align: center;
+    }
+
+    .pred-tag.green { background-color: #28a745; color: white; }
+    .pred-tag.yellow { background-color: #ffc107; color: #000; }
+    .pred-tag.red { background-color: #dc3545; color: white; }
+
+    .percent {
+        font-size: 14px;
+        font-weight: bold;
+        color: #666;
+    }
+
+    .time {
+        font-weight: 600;
+        color: #333;
+    }
+
+    .status {
+        font-weight: bold;
+        font-size: 12px;
+        color: #666;
+    }
+
+    /* Live match indicator */
+    .live-indicator {
+        background: #ff4444;
+        color: white;
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-size: 11px;
+        font-weight: bold;
+        animation: blink 1.5s infinite;
+    }
+
+    @keyframes blink {
+        0%, 50% { opacity: 1; }
+        51%, 100% { opacity: 0.6; }
+    }
+
+    /* Responsive design */
+    @media (max-width: 900px) {
+        .match-row {
+            grid-template-columns: 1fr 1fr;
+            grid-row-gap: 15px;
+        }
+
+        .odds { justify-content: flex-start; }
+        .avg, .prediction, .time, .status { text-align: left; }
+    }
+
+    @media (max-width: 600px) {
+        .league-header { font-size: 15px; padding: 10px; }
+        
+        .match-row {
+            grid-template-columns: 1fr;
+            padding: 15px 10px;
+        }
+
+        .odds { margin-top: 8px; }
+        .team-name { font-size: 15px; }
+        .odd-box { padding: 5px 8px; font-size: 13px; }
+    }
+</style>
+@endpush
+
+@section('content')
+<div class="col-lg-9 col-12">
+    <div style="margin-top: 6px; margin-bottom: 3px;">
+        <div class="row d-block d-lg-none" style="margin: auto; padding-top: 5px; border: 1px solid white; border-radius: 3px; background-color: white;">
+            <div class="col-lg-12 col-sm-12 o-hidden">
+                <div class="nav scrollable nav-fill small position-relative flex-nowrap fixturesTextSize">
+                    <!-- Date navigation can be added here -->
                 </div>
             </div>
-        @endforeach
-
-        <!-- Summary Statistics -->
-        <div class="card mt-4 shadow-sm">
-            <div class="card-header bg-info text-white">
-                <strong><i class="bi bi-graph-up"></i> Over/Under 2.5 Summary</strong>
-            </div>
-            <div class="card-body">
-                @php
-                    $allFixtures = collect($grouped)->flatten(1);
-                    $totalMatches = $allFixtures->count();
-                    $overCount = $allFixtures->filter(function($f) { return strpos($f['prediction'], 'Over') !== false; })->count();
-                    $underCount = $allFixtures->filter(function($f) { return strpos($f['prediction'], 'Under') !== false; })->count();
-                    $avgConfidence = $allFixtures->avg('confidence');
-                    $avgGoals = $allFixtures->where('goals_stats.total_matches', '>', 0)->avg('goals_stats.avg_goals');
-                @endphp
-                
-                <div class="row text-center">
-                    <div class="col-md-2">
-                        <h5 class="text-primary">{{ $totalMatches }}</h5>
-                        <small>Total Matches</small>
-                    </div>
-                    <div class="col-md-2">
-                        <h5 class="text-warning">{{ $overCount }}</h5>
-                        <small>Over 2.5</small>
-                    </div>
-                    <div class="col-md-2">
-                        <h5 class="text-info">{{ $underCount }}</h5>
-                        <small>Under 2.5</small>
-                    </div>
-                    <div class="col-md-3">
-                        <h5 class="text-success">{{ number_format($avgConfidence, 1) }}%</h5>
-                        <small>Average Confidence</small>
-                    </div>
-                    <div class="col-md-3">
-                        <h5 class="text-danger">{{ number_format($avgGoals, 1) }}</h5>
-                        <small>Avg H2H Goals</small>
-                    </div>
+            <div class="col-sm-12 datePicker" id="datePickerT">
+                <div class="row custom-select">
+                    <!-- Date picker can be added here -->
                 </div>
             </div>
         </div>
+    </div>
 
-    @else
-        <div class="alert alert-info text-center">
-            <i class="bi bi-info-circle"></i> No over/under 2.5 goals predictions available for today.
+    <div class="col-sm-12 text-center text-nowrap sites-card mb-1" style="background-color: rgb(238, 247, 255); font-weight: bold;">
+        <h1 class="h1headerTitle mb-0">Today's Football Predictions and Tips</h1>
+    </div>
+
+    <div class="match-container">
+        @if($grouped->isEmpty())
+            <div class="alert alert-info text-center" style="margin: 20px; padding: 20px;">
+                <h4>No matches scheduled for today</h4>
+                <p>Check back later or browse other prediction pages.</p>
+            </div>
+        @else
+            @foreach($grouped as $leagueKey => $matches)
+                @php
+                    $firstMatch = $matches->first();
+                    $countryCode = strtolower($firstMatch['country_flag'] ?? 'xx');
+                    // Handle country code mapping
+                    $flagMappings = [
+                        'england' => 'gb-eng',
+                        'scotland' => 'gb-sct',
+                        'wales' => 'gb-wls',
+                        'northern ireland' => 'gb-nir'
+                    ];
+                    $countryCode = $flagMappings[$countryCode] ?? $countryCode;
+                @endphp
+
+                <!-- League Header -->
+                <div class="league-header">
+                    @if($firstMatch['country_flag'])
+                        <img src="{{ $firstMatch['country_flag'] }}" 
+                             class="flag" 
+                             alt="{{ $firstMatch['country'] }}"
+                             onerror="this.src='{{ asset('images/default-flag.png') }}'">
+                    @endif
+                    <span class="league-title">{{ $firstMatch['country'] }} : {{ $firstMatch['league'] }}</span>
+                    <span class="standings" onclick="window.open('https://www.flashscore.com', '_blank')">Standings</span>
+                </div>
+
+                @foreach($matches as $match)
+                    <!-- Match Row -->
+                    <div class="match-row">
+                        <div class="match-teams">
+                            <div class="team-logos">
+                                @if($match['home_logo'])
+                                    <img src="{{ $match['home_logo'] }}" class="team-logo" alt="{{ $match['home_team'] }}">
+                                @endif
+                                <div class="team-name">{{ $match['home_team'] }}</div>
+                            </div>
+                            
+                            <div class="team-logos">
+                                @if($match['away_logo'])
+                                    <img src="{{ $match['away_logo'] }}" class="team-logo" alt="{{ $match['away_team'] }}">
+                                @endif
+                                <div class="team-name">{{ $match['away_team'] }}</div>
+                            </div>
+                            
+                            <div class="match-date">{{ \Carbon\Carbon::parse($match['match_date'])->format('d/m/Y') }}</div>
+                        </div>
+
+                        <div class="odds">
+                            @if($match['odds']['home'])
+                                <div class="odd-box {{ $match['prediction'] === '1' ? 'highlight' : '' }}">
+                                    {{ number_format($match['odds']['home'], 2) }}
+                                </div>
+                            @else
+                                <div class="odd-box">-</div>
+                            @endif
+
+                            @if($match['odds']['draw'])
+                                <div class="odd-box {{ $match['prediction'] === 'X' ? 'highlight' : '' }}">
+                                    {{ number_format($match['odds']['draw'], 2) }}
+                                </div>
+                            @else
+                                <div class="odd-box">-</div>
+                            @endif
+
+                            @if($match['odds']['away'])
+                                <div class="odd-box {{ $match['prediction'] === '2' ? 'highlight' : '' }}">
+                                    {{ number_format($match['odds']['away'], 2) }}
+                                </div>
+                            @else
+                                <div class="odd-box">-</div>
+                            @endif
+                        </div>
+
+                        <div class="avg">
+                            {{ $match['avg_goals'] ? number_format($match['avg_goals'], 1) : 'N/A' }}
+                        </div>
+
+                        <div class="prediction">
+                            @php
+                                $predClass = 'yellow'; // default
+                                if($match['prediction_color'] === 'green') $predClass = 'green';
+                                elseif($match['prediction_color'] === 'red') $predClass = 'red';
+                            @endphp
+                            <span class="pred-tag {{ $predClass }}">{{ $match['prediction'] }}</span>
+                            <span class="percent">{{ $match['confidence'] }}%</span>
+                        </div>
+
+                        <div class="time">
+                            @if($match['has_started'] && !$match['is_finished'])
+                                <span class="live-indicator">LIVE</span>
+                                @if($match['elapsed'])
+                                    <div style="font-size: 11px; margin-top: 2px;">{{ $match['elapsed'] }}'</div>
+                                @endif
+                            @elseif($match['is_finished'])
+                                <span style="color: #28a745; font-weight: bold;">FT</span>
+                                @if($match['home_score'] !== null && $match['away_score'] !== null)
+                                    <div style="font-size: 12px; margin-top: 2px;">
+                                        {{ $match['home_score'] }}-{{ $match['away_score'] }}
+                                    </div>
+                                @endif
+                            @else
+                                {{ $match['match_time'] }}
+                            @endif
+                        </div>
+
+                        <div class="status">
+                            @if($match['has_started'] && !$match['is_finished'])
+                                {{ $match['status_short'] }}
+                            @elseif($match['is_finished'])
+                                FT
+                            @else
+                                -
+                            @endif
+                        </div>
+                    </div>
+                @endforeach
+            @endforeach
+        @endif
+    </div>
+
+    @if($grouped->isNotEmpty())
+        <div class="text-center mt-4 mb-3">
+            <small class="text-muted">
+                <i class="fas fa-info-circle"></i> 
+                Predictions are based on statistical analysis and should be used as guidance only. 
+                <strong>Please bet responsibly.</strong>
+            </small>
         </div>
     @endif
 </div>
+@endsection
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-</body>
-</html>
+@push('scripts')
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Auto-refresh live matches every 30 seconds
+    const liveMatches = document.querySelectorAll('.live-indicator');
+    if (liveMatches.length > 0) {
+        setInterval(function() {
+            // You can implement AJAX refresh here for live matches
+            console.log('Checking for live match updates...');
+        }, 30000);
+    }
+
+    // Add click handlers for team names (optional - link to team stats)
+    document.querySelectorAll('.team-name').forEach(function(element) {
+        element.style.cursor = 'pointer';
+        element.addEventListener('click', function() {
+            // Optional: Add team stats modal or redirect
+            console.log('Team clicked:', this.textContent);
+        });
+    });
+});
+</script>
+@endpush
