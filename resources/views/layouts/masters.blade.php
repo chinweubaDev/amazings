@@ -3,7 +3,7 @@
 
 <head>
   <meta charset="utf-8" />
-  <title>Accurate Football Predictions | Amazingstakes</title>
+  <title>@yield('title', $seoTitle ?? 'Accurate Football Predictions | Amazingstakes')</title>
   <link rel="icon" href="{{ asset('amazingstakeslogo.ico') }}" />
   <link rel="dns-prefetch" href="{{ url('/') }}" />
   <link rel="preconnect" href="{{ url('/') }}" />
@@ -12,7 +12,7 @@
   <link href="https://www.googletagmanager.com/gtag/js?id=G-VZTNJSDL77" rel="preload" as="script" />
   <link rel="dns-prefetch" href="https://www.googletagmanager.com" />
   <link rel="preconnect" href="https://www.googletagmanager.com" />
-  <link rel="canonical" href="{{ asset('index.html') }}" />
+  <link rel="canonical" href="{{ $canonicalUrl ?? url()->current() }}" />
   <meta name="robots" content="index, follow" />
   <meta name="language" content="en" />
   <meta name="revisit-after" content="3 days" />
@@ -20,21 +20,21 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#202c3c" />
   <meta name="description"
-    content="Get daily winning football tips, 3 sure draws, and sure straight wins from Amazingstakes. Trusted in Nigeria, Kenya, Tanzania, Uganda, Ghana, Vietnam &amp; USA." />
+    content="{{ $seoDescription ?? 'Get daily winning football tips, 3 sure draws, and sure straight wins from Amazingstakes. Trusted in Nigeria, Kenya, Tanzania, Uganda, Ghana, Vietnam & USA.' }}" />
   <meta name="keywords"
-    content="Best prediction site, Sure Straight Wins Today, delivers winning tips, everyday winning tips, Accurate football prediction site, football tips, sure predictions, sites that predict football matches correctly, football prediction, unbeatable soccer predictions, successful soccer prediction" />
+    content="{{ $seoKeywords ?? 'Best prediction site, Sure Straight Wins Today, delivers winning tips, everyday winning tips, Accurate football prediction site, football tips, sure predictions, sites that predict football matches correctly, football prediction, unbeatable soccer predictions, successful soccer prediction' }}" />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:site" content="@amazingstakes" />
-  <meta name="twitter:title" content="Accurate Football Predictions | Amazingstakes" />
+  <meta name="twitter:title" content="@yield('title', $seoTitle ?? 'Accurate Football Predictions | Amazingstakes')" />
   <meta name="twitter:description"
-    content="Get daily winning football tips, 3 sure draws, and sure straight wins from Amazingstakes. Trusted in Nigeria, Kenya, Tanzania, Uganda, Ghana, Vietnam &amp; USA." />
+    content="{{ $seoDescription ?? 'Get daily winning football tips, 3 sure draws, and sure straight wins from Amazingstakes. Trusted in Nigeria, Kenya, Tanzania, Uganda, Ghana, Vietnam & USA.' }}" />
   <meta name="twitter:image" content="{{ asset('amazingstakeslogo.png') }}" />
-  <meta property="og:title" content="Accurate Football Predictions | Amazingstakes" />
+  <meta property="og:title" content="@yield('title', $seoTitle ?? 'Accurate Football Predictions | Amazingstakes')" />
   <meta property="og:type" content="website" />
-  <meta property="og:url" content="https://www.amazingstakes.com/" />
+  <meta property="og:url" content="{{ $canonicalUrl ?? url()->current() }}" />
   <meta property="og:image" content="{{ asset('amazingstakeslogo.png') }}" />
   <meta property="og:description"
-    content="Get daily winning football tips, 3 sure draws, and sure straight wins from Amazingstakes. Trusted in Nigeria, Kenya, Tanzania, Uganda, Ghana, Vietnam &amp; USA." />
+    content="{{ $seoDescription ?? 'Get daily winning football tips, 3 sure draws, and sure straight wins from Amazingstakes. Trusted in Nigeria, Kenya, Tanzania, Uganda, Ghana, Vietnam & USA.' }}" />
   <meta name="next-head-count" content="29" />
   <link rel="icon" href="{{ asset('amazingstakeslogo.ico') }}" />
   <script strategy="afterInteractive" src="https://www.googletagmanager.com/gtag/js?id=G-VZTNJSDL77" async=""

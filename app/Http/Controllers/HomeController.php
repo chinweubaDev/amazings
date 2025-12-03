@@ -11,17 +11,32 @@ class HomeController extends Controller
 {
     public function index()
     {
-        return $this->getPredictionsForDate(Carbon::today()->toDateString(), 'Today\'s');
+        return $this->getPredictionsForDate(Carbon::today()->toDateString(), 'Accurate Football Predictions', false, 'home', false, [
+            'title' => 'Accurate Football Predictions | Amazingstakes',
+            'description' => 'Get daily winning football tips, 3 sure draws, and sure straight wins from Amazingstakes. Trusted in Nigeria, Kenya, Tanzania, Uganda, Ghana, Vietnam & USA.',
+            'keywords' => 'Best prediction site, Sure Straight Wins Today, delivers winning tips, everyday winning tips, Accurate football prediction site, football tips, sure predictions, sites that predict football matches correctly, football prediction, unbeatable soccer predictions, successful soccer prediction',
+            'canonical' => url('/')
+        ]);
     }
 
     public function yesterday()
     {
-        return $this->getPredictionsForDate(Carbon::yesterday()->toDateString(), 'Yesterday\'s', false, 'yesterday');
+        return $this->getPredictionsForDate(Carbon::yesterday()->toDateString(), 'Yesterday Football Predictions', false, 'yesterday', false, [
+            'title' => 'Yesterday Football Predictions | Amazingstakes',
+            'description' => 'See yesterday\'s football predictions and results. Check how our tips performed.',
+            'keywords' => 'yesterday football predictions, yesterday soccer results, football tips yesterday, soccer predictions yesterday',
+            'canonical' => route('yesterday')
+        ]);
     }
 
     public function tomorrow()
     {
-        return $this->getPredictionsForDate(Carbon::tomorrow()->toDateString(), 'Tomorrow\'s', false, 'tomorrow');
+        return $this->getPredictionsForDate(Carbon::tomorrow()->toDateString(), 'Football Tips Tomorrow', false, 'tomorrow', false, [
+            'title' => 'Football Tips Tomorrow | Amazingstakes',
+            'description' => 'Get early football tips for tomorrow. Prepare your bets with our accurate predictions for tomorrow\'s matches.',
+            'keywords' => 'football tips tomorrow, tomorrow predictions, soccer predictions tomorrow, upcoming football tips',
+            'canonical' => route('tomorrow')
+        ]);
     }
 
     public function weekend()
@@ -45,12 +60,22 @@ class HomeController extends Controller
              $sunday = Carbon::today()->toDateString();
         }
 
-        return $this->getPredictionsForDate([$saturday, $sunday], 'Weekend', false, 'weekend');
+        return $this->getPredictionsForDate([$saturday, $sunday], 'Weekend Football Predictions', false, 'weekend', false, [
+            'title' => 'Weekend Football Predictions | Amazingstakes',
+            'description' => 'Get the best football predictions for this weekend. Saturday and Sunday tips for major leagues.',
+            'keywords' => 'weekend football predictions, weekend soccer tips, saturday football predictions, sunday football predictions',
+            'canonical' => route('weekend')
+        ]);
     }
 
     public function mustWin()
     {
-        return $this->getPredictionsForDate(Carbon::today()->toDateString(), 'Must Win Teams Today', true, 'must_win');
+        return $this->getPredictionsForDate(Carbon::today()->toDateString(), 'Must Win Teams Today', true, 'must_win', false, [
+            'title' => 'Must Win Teams Today | Amazingstakes',
+            'description' => 'Discover the teams that must win today. High confidence predictions for teams fighting for points.',
+            'keywords' => 'must win teams today, sure wins today, football teams to win, banker tips',
+            'canonical' => route('must_win')
+        ]);
     }
 
     public function upcoming()
@@ -61,31 +86,65 @@ class HomeController extends Controller
             $dates[] = Carbon::today()->addDays($i)->toDateString();
         }
         
-        return $this->getPredictionsForDate($dates, 'Upcoming Football Predictions', false, 'upcoming', true);
+        return $this->getPredictionsForDate($dates, 'Upcoming Football Predictions', false, 'upcoming', true, [
+            'title' => 'Upcoming Football Predictions | Amazingstakes',
+            'description' => 'Check out upcoming football predictions for the next few days. Plan your bets ahead with our expert analysis.',
+            'keywords' => 'upcoming football predictions, future soccer matches, football tips next 3 days, upcoming fixtures predictions',
+            'canonical' => route('upcoming')
+        ]);
     }
 
     public function tips180()
     {
-        return view('tips180', ['pageTitle' => '180 Predictions Today']);
+        return view('tips180', [
+            'pageTitle' => '180 Predictions Today',
+            'seoTitle' => '180 Predictions Today | Amazingstakes',
+            'seoDescription' => 'Get our exclusive 180 predictions today. High value tips for serious bettors.',
+            'seoKeywords' => '180 predictions, 180 tips, high value football tips, expert soccer predictions',
+            'canonicalUrl' => route('tips180')
+        ]);
     }
 
     public function victorPredict()
     {
-        return view('victor', ['pageTitle' => 'Top Predictions (Top Picks)']);
+        return view('victor', [
+            'pageTitle' => 'Top Predictions (Top Picks)',
+            'seoTitle' => 'Top Predictions (Top Picks) | Amazingstakes',
+            'seoDescription' => 'Our top picks and best predictions for today. Hand-picked selections by our experts.',
+            'seoKeywords' => 'top predictions, top picks, best football tips, expert picks today',
+            'canonicalUrl' => route('victor_predict')
+        ]);
     }
 
     public function jackpot()
     {
-        return view('jackpot', ['pageTitle' => 'Jackpot Predictions']);
+        return view('jackpot', [
+            'pageTitle' => 'Jackpot Predictions',
+            'seoTitle' => 'Jackpot Predictions | Amazingstakes',
+            'seoDescription' => 'Win big with our jackpot predictions. Analysis for major jackpot pools.',
+            'seoKeywords' => 'jackpot predictions, mega jackpot tips, football jackpot analysis',
+            'canonicalUrl' => route('jackpot')
+        ]);
     }
 
     public function trends()
     {
-        return view('trends', ['pageTitle' => 'Top Trends']);
+        return view('trends', [
+            'pageTitle' => 'Top Trends',
+            'seoTitle' => 'Top Trends | Amazingstakes',
+            'seoDescription' => 'Follow the latest football trends. Teams on winning streaks, goal scoring trends, and more.',
+            'seoKeywords' => 'football trends, soccer betting trends, team streaks, form guide',
+            'canonicalUrl' => route('trends')
+        ]);
     }
 
-    private function getPredictionsForDate($date, $titlePrefix, $mustWinOnly = false, $viewName = 'home', $mixMarkets = false)
+    private function getPredictionsForDate($date, $titlePrefix, $mustWinOnly = false, $viewName = 'home', $mixMarkets = false, $seoData = [])
     {
+        // Default SEO data
+        $seoTitle = $seoData['title'] ?? $titlePrefix . ' | Amazingstakes';
+        $seoDescription = $seoData['description'] ?? 'Get daily winning football tips, 3 sure draws, and sure straight wins from Amazingstakes. Trusted in Nigeria, Kenya, Tanzania, Uganda, Ghana, Vietnam & USA.';
+        $seoKeywords = $seoData['keywords'] ?? 'Best prediction site, Sure Straight Wins Today, delivers winning tips, everyday winning tips, Accurate football prediction site, football tips, sure predictions, sites that predict football matches correctly, football prediction, unbeatable soccer predictions, successful soccer prediction';
+        $canonicalUrl = $seoData['canonical'] ?? url()->current();
         // Fetch fixtures with their relationships
         $query = Fixture::with(['league', 'odds'])
             ->orderBy('date', 'asc');
@@ -162,20 +221,6 @@ class HomeController extends Controller
             })->sortByDesc('confidence');
         }
 
-        // Group by Country - League for organized display
-        $grouped = $data->groupBy(function ($item) {
-            return $item['country'] . ' - ' . $item['league'];
-        });
-
-        return view($viewName, [
-            'grouped' => $grouped,
-            'pageTitle' => $titlePrefix,
-            'currentDate' => is_array($date) ? implode(' - ', $date) : $date
-        ]);
-    }
-  
-    public function showdouble()
-    {
         $today = Carbon::today()->toDateString();
 
         // Fetch today's fixtures with their relationships

@@ -70,10 +70,18 @@ class LeagueController extends Controller
             }
         }
 
+        $seoTitle = "Football Predictions for {$league->name} ({$league->country_name}) | Amazingstakes";
+        $seoDescription = "Get accurate {$league->name} football predictions, stats, and tips. We cover all matches in {$league->country_name} with high confidence predictions.";
+        $seoKeywords = "{$league->name} predictions, {$league->name} tips, {$league->country_name} football, {$league->name} betting tips, soccer predictions {$league->country_name}";
+
         return view('league', [
             'pageTitle' => 'Football Predictions for ' . $league->name,
             'grouped' => $transformed,
-            'league' => $league
+            'league' => $league,
+            'seoTitle' => $seoTitle,
+            'seoDescription' => $seoDescription,
+            'seoKeywords' => $seoKeywords,
+            'canonicalUrl' => route('league.show', ['slug' => $slug])
         ]);
     }
 

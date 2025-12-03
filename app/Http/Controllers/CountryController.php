@@ -82,10 +82,18 @@ class CountryController extends Controller
             }
         }
 
+        $seoTitle = "Football Predictions for {$country->name} | Amazingstakes";
+        $seoDescription = "Get accurate football predictions for all leagues in {$country->name}. Expert tips, stats, and analysis for {$country->name} soccer matches.";
+        $seoKeywords = "{$country->name} football predictions, {$country->name} soccer tips, {$country->name} betting advice, football tips {$country->name}";
+
         return view('country', [
             'pageTitle' => 'Football Predictions for ' . $country->name,
             'grouped' => $transformed,
-            'country' => $country
+            'country' => $country,
+            'seoTitle' => $seoTitle,
+            'seoDescription' => $seoDescription,
+            'seoKeywords' => $seoKeywords,
+            'canonicalUrl' => route('country.show', ['slug' => $slug])
         ]);
     }
 
