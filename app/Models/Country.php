@@ -26,4 +26,10 @@ class Country extends Model
     {
         return $this->hasManyThrough(Fixture::class, League::class, 'country_code', 'league_id', 'code', 'league_id');
     }
+
+    public function getSlugAttribute()
+    {
+        $name = \Illuminate\Support\Str::slug($this->name);
+        return "football-predictions-for-{$name}";
+    }
 }

@@ -35,4 +35,8 @@ return [
         ],
     ],
 
+    'football_api' => [
+        'key' => env('FOOTBALL_API_KEY'),
+    ],
+
 ];

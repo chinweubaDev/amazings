@@ -11,23 +11,106 @@ class HomeController extends Controller
 {
     public function index()
     {
-        $today = Carbon::today()->toDateString();
+        return $this->getPredictionsForDate(Carbon::today()->toDateString(), 'Today\'s');
+    }
 
-        // Fetch today's fixtures with their relationships
-        $fixtures = Fixture::with(['league', 'odds'])
-            ->whereDate('date', $today)
-            ->orderBy('date', 'asc')
-            ->get();
+    public function yesterday()
+    {
+        return $this->getPredictionsForDate(Carbon::yesterday()->toDateString(), 'Yesterday\'s', false, 'yesterday');
+    }
+
+    public function tomorrow()
+    {
+        return $this->getPredictionsForDate(Carbon::tomorrow()->toDateString(), 'Tomorrow\'s', false, 'tomorrow');
+    }
+
+    public function weekend()
+    {
+        $saturday = Carbon::now()->next(Carbon::SATURDAY)->toDateString();
+        $sunday = Carbon::now()->next(Carbon::SUNDAY)->toDateString();
+        
+        // If today is Saturday, use today and tomorrow (Sunday)
+        if (Carbon::now()->isSaturday()) {
+            $saturday = Carbon::today()->toDateString();
+            $sunday = Carbon::tomorrow()->toDateString();
+        }
+        // If today is Sunday, use today only (or maybe next weekend? usually users want upcoming games)
+        // Let's assume if it's Sunday, we show today's games as "Weekend" or maybe next weekend.
+        // Standard practice: "Weekend" usually means upcoming Sat/Sun.
+        // If today is Sunday, "Weekend" might refer to *this* weekend (so just today left) or *next* weekend.
+        // Let's stick to: Weekend = This coming Saturday and Sunday.
+        // If today is Sunday, let's show today.
+        if (Carbon::now()->isSunday()) {
+             $saturday = Carbon::today()->toDateString(); // It's Sunday, so start today
+             $sunday = Carbon::today()->toDateString();
+        }
+
+        return $this->getPredictionsForDate([$saturday, $sunday], 'Weekend', false, 'weekend');
+    }
+
+    public function mustWin()
+    {
+        return $this->getPredictionsForDate(Carbon::today()->toDateString(), 'Must Win Teams Today', true, 'must_win');
+    }
+
+    public function upcoming()
+    {
+        // Get next 4 days starting from tomorrow
+        $dates = [];
+        for ($i = 1; $i <= 4; $i++) {
+            $dates[] = Carbon::today()->addDays($i)->toDateString();
+        }
+        
+        return $this->getPredictionsForDate($dates, 'Upcoming Football Predictions', false, 'upcoming', true);
+    }
+
+    public function tips180()
+    {
+        return view('tips180', ['pageTitle' => '180 Predictions Today']);
+    }
+
+    public function victorPredict()
+    {
+        return view('victor', ['pageTitle' => 'Top Predictions (Top Picks)']);
+    }
+
+    public function jackpot()
+    {
+        return view('jackpot', ['pageTitle' => 'Jackpot Predictions']);
+    }
+
+    public function trends()
+    {
+        return view('trends', ['pageTitle' => 'Top Trends']);
+    }
+
+    private function getPredictionsForDate($date, $titlePrefix, $mustWinOnly = false, $viewName = 'home', $mixMarkets = false)
+    {
+        // Fetch fixtures with their relationships
+        $query = Fixture::with(['league', 'odds'])
+            ->orderBy('date', 'asc');
+
+        if (is_array($date)) {
+            $query->whereBetween('date', $date);
+        } else {
+            $query->whereDate('date', $date);
+        }
+
+        $fixtures = $query->get();
 
         // Transform fixtures into structured data
-        $data = $fixtures->map(function ($fixture) {
+        $data = $fixtures->map(function ($fixture) use ($mixMarkets) {
             // Parse JSON fields if they're stored as strings
             $odds = is_array($fixture->odds) ? $fixture->odds : (json_decode($fixture->odds, true) ?? []);
             $h2h = is_array($fixture->head2head) ? $fixture->head2head : (json_decode($fixture->head2head, true) ?? []);
             $stats = is_array($fixture->statistics) ? $fixture->statistics : (json_decode($fixture->statistics, true) ?? []);
             
             // Get prediction for this fixture
-            $predictionOutcome = $this->predictFixture($fixture, $odds, $h2h, $stats);
+            if ($mixMarkets) {
+                $predictionOutcome = $this->getBestPrediction($fixture, $odds, $h2h, $stats);
+            } else {
+                $predictionOutcome = $this->predictFixture($fixture, $odds, $h2h, $stats);
+            }
 
             // Get match winner odds
             $matchWinnerOdds = $this->getMatchWinnerOdds($fixture, $odds);
@@ -56,6 +139,7 @@ class HomeController extends Controller
                         $fixture->goals_home, 
                         $fixture->goals_away
                     ),
+                'market_name' => $predictionOutcome['market_name'] ?? 'Match Winner',
                 'odds' => $matchWinnerOdds,
                 'avg_goals' => $avgGoals,
                 'status' => $fixture->status_long ?? 'Scheduled',
@@ -71,12 +155,23 @@ class HomeController extends Controller
             ];
         });
 
+        if ($mustWinOnly) {
+            $data = $data->filter(function ($item) {
+                // Must be Home (1) or Away (2) win, and confidence >= 75
+                return in_array($item['prediction'], ['1', '2']) && $item['confidence'] >= 75;
+            })->sortByDesc('confidence');
+        }
+
         // Group by Country - League for organized display
         $grouped = $data->groupBy(function ($item) {
             return $item['country'] . ' - ' . $item['league'];
         });
 
-        return view('home', ['grouped' => $grouped]);
+        return view($viewName, [
+            'grouped' => $grouped,
+            'pageTitle' => $titlePrefix,
+            'currentDate' => is_array($date) ? implode(' - ', $date) : $date
+        ]);
     }
   
     public function showdouble()
@@ -328,6 +423,75 @@ class HomeController extends Controller
             'draw' => rand(110, 150) / 100, // X2 odds (1.10 to 1.50)
             'away' => rand(110, 150) / 100, // 12 odds (1.10 to 1.50)
         ];
+    }
+
+    private function getBestPrediction($fixture, $odds, $h2h, $stats)
+    {
+        $predictions = [];
+
+        // 1. Match Winner
+        $matchWinner = $this->predictFixture($fixture, $odds, $h2h, $stats);
+        $predictions[] = [
+            'market_name' => 'Match Winner',
+            'prediction' => $matchWinner['prediction'],
+            'confidence' => $matchWinner['confidence'],
+            'odd' => $matchWinner['odd']
+        ];
+
+        // 2. Double Chance (Simulated logic based on Match Winner for now to save complexity)
+        // If Match Winner confidence is low (< 60), Double Chance is usually safer/higher confidence
+        $dcPrediction = '1X';
+        $dcConfidence = $matchWinner['confidence'] + 15; // Boost confidence
+        if ($matchWinner['prediction'] === '2') {
+            $dcPrediction = 'X2';
+        } elseif ($matchWinner['prediction'] === 'X') {
+            $dcPrediction = '1X'; // or X2, let's default to Home/Draw
+        }
+        
+        $predictions[] = [
+            'market_name' => 'Double Chance',
+            'prediction' => $dcPrediction,
+            'confidence' => min($dcConfidence, 99), // Cap at 99
+            'odd' => null // We'd need to fetch specific odds
+        ];
+
+        // 3. Over/Under 2.5
+        $avgGoals = $this->calculateAverageGoals($h2h);
+        if ($avgGoals !== null) {
+            $ouPrediction = $avgGoals > 2.5 ? 'Over 2.5' : 'Under 2.5';
+            // Simple confidence metric based on how far from 2.5
+            $diff = abs($avgGoals - 2.5);
+            $ouConfidence = 50 + ($diff * 20); // e.g. 3.0 avg -> 0.5 diff -> 60% confidence
+            
+            $predictions[] = [
+                'market_name' => 'Over/Under 2.5',
+                'prediction' => $ouPrediction,
+                'confidence' => min($ouConfidence, 95),
+                'odd' => null
+            ];
+        }
+
+        // 4. BTTS
+        // Simple logic: if avg goals > 2.5, likely BTTS Yes
+        if ($avgGoals !== null) {
+            $bttsPrediction = $avgGoals > 2.5 ? 'Yes' : 'No';
+            $bttsConfidence = 50 + (abs($avgGoals - 2.5) * 15);
+            
+            $predictions[] = [
+                'market_name' => 'Both Teams To Score',
+                'prediction' => $bttsPrediction,
+                'confidence' => min($bttsConfidence, 90),
+                'odd' => null
+            ];
+        }
+
+        // Sort by confidence descending
+        usort($predictions, function ($a, $b) {
+            return $b['confidence'] <=> $a['confidence'];
+        });
+
+        // Return the best one
+        return $predictions[0];
     }
 
     private function predictFixture($fixture, $odds, $h2h, $stats)

@@ -298,14 +298,19 @@
                             {{ $match['avg_goals'] ? number_format($match['avg_goals'], 1) : 'N/A' }}
                         </div>
 
-                        <div class="prediction">
-                            @php
-                                $predClass = 'yellow'; // default
-                                if($match['prediction_color'] === 'green') $predClass = 'green';
-                                elseif($match['prediction_color'] === 'red') $predClass = 'red';
-                            @endphp
-                            <span class="pred-tag {{ $predClass }}">{{ $match['prediction'] }}</span>
-                            <span class="percent">{{ $match['confidence'] }}%</span>
+                        <div class="prediction" style="flex-direction: column; align-items: center;">
+                            <div style="font-size: 11px; color: #333; font-weight: bold; margin-bottom: 3px; white-space: nowrap;">
+                                {{ $match['market_name'] ?? 'Match Winner' }}
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                @php
+                                    $predClass = 'yellow'; // default
+                                    if($match['prediction_color'] === 'green') $predClass = 'green';
+                                    elseif($match['prediction_color'] === 'red') $predClass = 'red';
+                                @endphp
+                                <span class="pred-tag {{ $predClass }}">{{ $match['prediction'] }}</span>
+                                <span class="percent">{{ $match['confidence'] }}%</span>
+                            </div>
                         </div>
 
                         <div class="time">

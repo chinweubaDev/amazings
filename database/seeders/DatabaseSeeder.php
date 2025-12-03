@@ -24,6 +24,9 @@ class DatabaseSeeder extends Seeder
 
         // Seed fixtures, leagues, countries, and odds
         $this->call([
+            CountriesSeeder::class,
+            LeaguesSeeder::class,
+            TopLeaguesSeeder::class,
             FixtureSeeder::class,
         ]);
     }

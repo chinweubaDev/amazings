@@ -45,4 +45,11 @@ class League extends Model
     {
         return $this->hasMany(Fixture::class, 'league_id', 'league_id');
     }
+
+    public function getSlugAttribute()
+    {
+        $country = \Illuminate\Support\Str::slug($this->country_name);
+        $name = \Illuminate\Support\Str::slug($this->name);
+        return "football-predictions-for-{$country}/{$name}-{$this->league_id}";
+    }
 }
