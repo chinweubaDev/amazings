@@ -21,9 +21,9 @@
                 $collapseId = 'Country' . $country->id . 'Collapse';
             @endphp
             
-            @if($loop->index == 10)
+            @if($loop->index == 20)
                 <div class="more-countries-chunk" style="display: none;">
-            @elseif($loop->index > 10 && ($loop->index - 10) % 10 == 0)
+            @elseif($loop->index > 10 && ($loop->index - 20) % 20 == 0)
                 </div><div class="more-countries-chunk" style="display: none;">
             @endif
 
@@ -49,12 +49,12 @@
                 </div>
             </div>
 
-            @if($loop->last && $loop->count > 10)
+            @if($loop->last && $loop->count > 20)
                 </div>
             @endif
             @endforeach
 
-            @if(count($countries) > 10)
+            @if(count($countries) > 20)
             <button id="showMoreCountriesBtn" class="list-group-item p-1 btn btn-link" style="color: rgb(255, 0, 67); text-decoration: underline; font-weight: bold; border: none; text-align: left;" onclick="showNextChunk()">Show More &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <i class="bi bi-arrow-down-short"></i></button><br>
             @endif
       </div>

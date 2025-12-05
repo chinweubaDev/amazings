@@ -202,142 +202,45 @@
         <h1 class="h1headerTitle mb-0">{{ $pageTitle ?? 'Today\'s Football Predictions and Tips' }}</h1>
     </div>
 
-    <!-- Date Navigation -->
-    <div class="d-flex justify-content-center mb-3">
-        <div class="btn-group" role="group" aria-label="Date Navigation">
-            <a href="{{ route('yesterday') }}" class="btn btn-outline-primary {{ request()->routeIs('yesterday') ? 'active' : '' }}">Yesterday</a>
-            <a href="{{ route('home') }}" class="btn btn-outline-primary {{ request()->routeIs('home') ? 'active' : '' }}">Today</a>
-            <a href="{{ route('tomorrow') }}" class="btn btn-outline-primary {{ request()->routeIs('tomorrow') ? 'active' : '' }}">Tomorrow</a>
-            <a href="{{ route('weekend') }}" class="btn btn-outline-primary {{ request()->routeIs('weekend') ? 'active' : '' }}">Weekend</a>
-            <a href="{{ route('upcoming') }}" class="btn btn-outline-primary {{ request()->routeIs('upcoming') ? 'active' : '' }}">Upcoming</a>
-            <a href="{{ route('must.win') }}" class="btn btn-outline-danger {{ request()->routeIs('must.win') ? 'active' : '' }}">Must Win</a>
-        </div>
-    </div>
+ @include('partials.topbar')
+  
 
-    <div class="match-container">
+    <div class="match-container" data-total-leagues="{{ $totalLeagues }}" data-initial-limit="{{ $initialLimit }}">
         @if($grouped->isEmpty())
             <div class="alert alert-info text-center" style="margin: 20px; padding: 20px;">
                 <h4>No matches scheduled for today</h4>
                 <p>Check back later or browse other prediction pages.</p>
             </div>
         @else
-            @foreach($grouped as $leagueKey => $matches)
+            <div id="leagues-container">
                 @php
-                    $firstMatch = $matches->first();
-                    $countryCode = strtolower($firstMatch['country_flag'] ?? 'xx');
-                    // Handle country code mapping
-                    $flagMappings = [
-                        'england' => 'gb-eng',
-                        'scotland' => 'gb-sct',
-                        'wales' => 'gb-wls',
-                        'northern ireland' => 'gb-nir'
-                    ];
-                    $countryCode = $flagMappings[$countryCode] ?? $countryCode;
+                    $leagueCount = 0;
                 @endphp
-
-                <!-- League Header -->
-                <div class="league-header">
-                    @if($firstMatch['country_flag'])
-                        <img src="{{ $firstMatch['country_flag'] }}" 
-                             class="flag" 
-                             alt="{{ $firstMatch['country'] }}"
-                             onerror="this.src='{{ asset('images/default-flag.png') }}'">
+                @foreach($grouped as $leagueKey => $matches)
+                    @if($leagueCount < $initialLimit)
+                        @include('partials.league-section', [
+                            'leagueKey' => $leagueKey,
+                            'matches' => $matches,
+                            'firstMatch' => $matches->first()
+                        ])
+                        @php
+                            $leagueCount++;
+                        @endphp
                     @endif
-                    <span class="league-title">{{ $firstMatch['country'] }} : {{ $firstMatch['league'] }}</span>
-                    <span class="standings" onclick="window.open('https://www.flashscore.com', '_blank')">Standings</span>
-                </div>
-
-                @foreach($matches as $match)
-                    <!-- Match Row -->
-                    <div class="match-row">
-                        <div class="match-teams">
-                            <div class="team-logos">
-                                @if($match['home_logo'])
-                                    <img src="{{ $match['home_logo'] }}" class="team-logo" alt="{{ $match['home_team'] }}">
-                                @endif
-                                <div class="team-name">{{ $match['home_team'] }}</div>
-                            </div>
-                            
-                            <div class="team-logos">
-                                @if($match['away_logo'])
-                                    <img src="{{ $match['away_logo'] }}" class="team-logo" alt="{{ $match['away_team'] }}">
-                                @endif
-                                <div class="team-name">{{ $match['away_team'] }}</div>
-                            </div>
-                            
-                            <div class="match-date">{{ \Carbon\Carbon::parse($match['match_date'])->format('d/m/Y') }}</div>
-                        </div>
-
-                        <div class="odds">
-                            @if($match['odds']['home'])
-                                <div class="odd-box {{ $match['prediction'] === '1' ? 'highlight' : '' }}">
-                                    {{ number_format($match['odds']['home'], 2) }}
-                                </div>
-                            @else
-                                <div class="odd-box">-</div>
-                            @endif
-
-                            @if($match['odds']['draw'])
-                                <div class="odd-box {{ $match['prediction'] === 'X' ? 'highlight' : '' }}">
-                                    {{ number_format($match['odds']['draw'], 2) }}
-                                </div>
-                            @else
-                                <div class="odd-box">-</div>
-                            @endif
-
-                            @if($match['odds']['away'])
-                                <div class="odd-box {{ $match['prediction'] === '2' ? 'highlight' : '' }}">
-                                    {{ number_format($match['odds']['away'], 2) }}
-                                </div>
-                            @else
-                                <div class="odd-box">-</div>
-                            @endif
-                        </div>
-
-                        <div class="avg">
-                            {{ $match['avg_goals'] ? number_format($match['avg_goals'], 1) : 'N/A' }}
-                        </div>
-
-                        <div class="prediction">
-                            @php
-                                $predClass = 'yellow'; // default
-                                if($match['prediction_color'] === 'green') $predClass = 'green';
-                                elseif($match['prediction_color'] === 'red') $predClass = 'red';
-                            @endphp
-                            <span class="pred-tag {{ $predClass }}">{{ $match['prediction'] }}</span>
-                            <span class="percent">{{ $match['confidence'] }}%</span>
-                        </div>
-
-                        <div class="time">
-                            @if($match['has_started'] && !$match['is_finished'])
-                                <span class="live-indicator">LIVE</span>
-                                @if($match['elapsed'])
-                                    <div style="font-size: 11px; margin-top: 2px;">{{ $match['elapsed'] }}'</div>
-                                @endif
-                            @elseif($match['is_finished'])
-                                <span style="color: #28a745; font-weight: bold;">FT</span>
-                                @if($match['home_score'] !== null && $match['away_score'] !== null)
-                                    <div style="font-size: 12px; margin-top: 2px;">
-                                        {{ $match['home_score'] }}-{{ $match['away_score'] }}
-                                    </div>
-                                @endif
-                            @else
-                                {{ $match['match_time'] }}
-                            @endif
-                        </div>
-
-                        <div class="status">
-                            @if($match['has_started'] && !$match['is_finished'])
-                                {{ $match['status_short'] }}
-                            @elseif($match['is_finished'])
-                                FT
-                            @else
-                                -
-                            @endif
-                        </div>
-                    </div>
                 @endforeach
-            @endforeach
+            </div>
+
+            @if($totalLeagues > $initialLimit)
+                <div class="text-center my-4">
+                    <button id="show-more-btn" class="btn btn-primary btn-lg" data-offset="{{ $initialLimit }}">
+                        <span class="btn-text">Show More Leagues</span>
+                        <span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+                    </button>
+                    <div class="mt-2">
+                        <small class="text-muted">Showing <span id="loaded-count">{{ $initialLimit }}</span> of <span id="total-count">{{ $totalLeagues }}</span> leagues</small>
+                    </div>
+                </div>
+            @endif
         @endif
     </div>
 
@@ -373,6 +276,86 @@ document.addEventListener('DOMContentLoaded', function() {
             console.log('Team clicked:', this.textContent);
         });
     });
+
+    // Show More button functionality
+    const showMoreBtn = document.getElementById('show-more-btn');
+    if (showMoreBtn) {
+        showMoreBtn.addEventListener('click', function() {
+            const btn = this;
+            const btnText = btn.querySelector('.btn-text');
+            const spinner = btn.querySelector('.spinner-border');
+            const offset = parseInt(btn.dataset.offset);
+            const limit = 10;
+
+            // Get current page date from URL or use today
+            const currentPath = window.location.pathname;
+            let date = '{{ \Carbon\Carbon::today()->toDateString() }}';
+            let mustWinOnly = false;
+            let mixMarkets = false;
+
+            // Determine date based on current route
+            if (currentPath.includes('yesterday')) {
+                date = '{{ \Carbon\Carbon::yesterday()->toDateString() }}';
+            } else if (currentPath.includes('tomorrow')) {
+                date = '{{ \Carbon\Carbon::tomorrow()->toDateString() }}';
+            } else if (currentPath.includes('must-win')) {
+                mustWinOnly = true;
+            } else if (currentPath.includes('upcoming')) {
+                mixMarkets = true;
+            }
+
+            // Show loading state
+            btn.disabled = true;
+            btnText.textContent = 'Loading...';
+            spinner.classList.remove('d-none');
+
+            // Make AJAX request
+            fetch('{{ route("load.more.leagues") }}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                },
+                body: JSON.stringify({
+                    date: date,
+                    offset: offset,
+                    limit: limit,
+                    mustWinOnly: mustWinOnly,
+                    mixMarkets: mixMarkets
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Append new leagues to container
+                    const container = document.getElementById('leagues-container');
+                    container.insertAdjacentHTML('beforeend', data.html);
+
+                    // Update offset
+                    btn.dataset.offset = data.loaded;
+
+                    // Update counter
+                    document.getElementById('loaded-count').textContent = data.loaded;
+
+                    // Hide button if no more leagues
+                    if (!data.hasMore) {
+                        btn.parentElement.style.display = 'none';
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('Error loading more leagues:', error);
+                alert('Failed to load more leagues. Please try again.');
+            })
+            .finally(() => {
+                // Reset button state
+                btn.disabled = false;
+                btnText.textContent = 'Show More Leagues';
+                spinner.classList.add('d-none');
+            });
+        });
+    }
 });
 </script>
 @endpush
+```

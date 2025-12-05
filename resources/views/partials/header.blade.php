@@ -42,7 +42,7 @@
     <nav class="navbar navbar-expand-lg navbar-dark sideNavCustom1" style="background-color: #353f51">
       <div class="container desktop-container-resize mb-2">
         <div class="d-none d-xl-block d-lg-block mt-2" style="height: 100%; width: 21%; display: block">
-          <a class="navbar-brand" href="index.html"><img src="amazingstakeslogo.png" style="height: 100%; width: 100%"
+          <a class="navbar-brand" href="index"><img src="amazingstakeslogo.png" style="height: 100%; width: 100%"
               alt="logo" /></a>
         </div>
         <button class="btn btn-primary d-lg-none" aria-label="menu" id="sidebarToggle"
@@ -50,7 +50,7 @@
           <span class="navbar-toggler-icon" role="button" aria-label="Toggle navigation"></span>
         </button>
         <div class="d-lg-none" style="height: 100%; width: 60%; object-fit: contain">
-          <a class="navbar-brand d-lg-none" href="index.html"><img src="amazingstakeslogo.png" height="100%"
+          <a class="navbar-brand d-lg-none" href="index"><img src="amazingstakeslogo.png" height="100%"
               width="100%" alt="logo" /></a>
         </div>
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#searchBar"
@@ -62,37 +62,22 @@
             <li class="nav-item">   </li>
             <li class="nav-item">   </li>
             <li class="nav-item">
-              <a class="nav-link text-light" href="index.html">Home</a>
+              <a class="nav-link text-light" href="/">Home</a>
+            </li>
+           
+               <li class="nav-item">
+              <a href="/tomorrow-predictions" class="nav-link text-light">Football Tips Tomorrow</a>
             </li>
             <li class="nav-item">
-              <a class="nav-link text-light" href="live-predictions.html">LIVE</a>
+              <a href="/yesterday-predictions" class="nav-link text-light">Football Tips Yesterday</a>
             </li>
+            
             <li class="nav-item">
-              <a class="nav-link text-light" href="my-favourite-predictions.html"><i class="bi bi-star"></i>
-                Favourites <span class="number-circle rounded-square fixturesTextSize" style="
-                      background-color: white;
-                      color: red;
-                      font-weight: bold;
-                      font-size: 14px;
-                    ">0</span></a>
+              <a class="nav-link text-light" href="must-win-teams-today">Must Win Teams</a>
             </li>
-            <li class="nav-item">
-              <a class="nav-link text-light" href="team-comparison.html">H2H Comparison - Teams</a>
-            </li>
-            <li class="nav-item">
-              <a class="nav-link text-light" href="must-win-teams-today.html">Must Win Teams</a>
-            </li>
-            <li class="nav-item">
-              <a class="nav-link text-light" href="jackpot-predictions.html">All Jackpot Predictions</a>
-            </li>
+         
           </ul>
         </div>
-        <div class="collapse navbar-collapse fixturesTextSize" id="searchBar" style="flex-grow: 0">
-          <br />
-          <form class="d-flex">
-            <input class="form-control h-100" type="text" placeholder="Type Min. 3 charcters to search..."
-              id="searchInput" />
-          </form>
-        </div>
+       
       </div>
     </nav>

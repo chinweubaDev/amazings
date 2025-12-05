@@ -202,6 +202,7 @@
         <h1 class="h1headerTitle mb-0">Today's Football Predictions and Tips</h1>
     </div>
 
+ @include('partials.topbar')
     <div class="match-container">
         @if($grouped->isEmpty())
             <div class="alert alert-info text-center" style="margin: 20px; padding: 20px;">
@@ -229,7 +230,7 @@
                         <img src="{{ $firstMatch['country_flag'] }}" 
                              class="flag" 
                              alt="{{ $firstMatch['country'] }}"
-                             onerror="this.src='{{ asset('images/default-flag.png') }}'">
+                             >
                     @endif
                     <span class="league-title">{{ $firstMatch['country'] }} : {{ $firstMatch['league'] }}</span>
                     <span class="standings" onclick="window.open('https://www.flashscore.com', '_blank')">Standings</span>

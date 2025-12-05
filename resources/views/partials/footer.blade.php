@@ -33,27 +33,27 @@
 						<div class="col-4 col-md-2"><span class="mb-4 font-weight-bold footerLinks">Support
 								Links</span><br /><br />
 							<ul class="nav flex-column fixturesTextSize">
-								<li class="nav-item mb-2"><a href="contact-us.html" class="nav-a p-0 text-light">Contact
+								<li class="nav-item mb-2"><a href="contact-us" class="nav-a p-0 text-light">Contact
 										us</a></li>
-								<li class="nav-item mb-2"><a href="terms.html" class="nav-a p-0 text-light">Terms and
+								<li class="nav-item mb-2"><a href="terms" class="nav-a p-0 text-light">Terms and
 										Conditions</a></li>
-								<li class="nav-item mb-2"><a href="faq.html" class="nav-a p-0 text-light">FAQs</a></li>
-								<li class="nav-item mb-2"><a href="privacy.html" class="nav-a p-0 text-light">Privacy
+								<li class="nav-item mb-2"><a href="faq" class="nav-a p-0 text-light">FAQs</a></li>
+								<li class="nav-item mb-2"><a href="privacy" class="nav-a p-0 text-light">Privacy
 										Policy</a></li>
-								<li class="nav-item mb-2"><a href="about-us.html" class="nav-a p-0 text-light">About
+								<li class="nav-item mb-2"><a href="about-us" class="nav-a p-0 text-light">About
 										us</a></li>
-								<li class="nav-item mb-2"><a href="refund.html" class="nav-a p-0 text-light">Refund
+								<li class="nav-item mb-2"><a href="refund" class="nav-a p-0 text-light">Refund
 										Policy</a></li>
-								<li class="nav-item mb-2"><a href="links.html" class="nav-a p-0 text-light">Partners</a>
+								<li class="nav-item mb-2"><a href="links" class="nav-a p-0 text-light">Partners</a>
 								</li>
 							</ul>
 						</div>
 						<div class="col-8 col-md-3"><span class="mb-4 font-weight-bold footerLinks">Quick
 								links</span><br /><br />
 							<ul class="nav flex-column fixturesTextSize footerPart3">
-								<li class="nav-item mb-2"><a href="jackpot-predictions.html"
+								<li class="nav-item mb-2"><a href="jackpot-predictions"
 										class="nav-a p-0 text-light">Jackpot Predictions</a></li>
-								<li class="nav-item mb-2"><a href="news/index.html"
+								<li class="nav-item mb-2"><a href="news/index"
 										class="nav-a p-0 text-light">Blog/GP</a></li>
 							</ul>
 						</div>
@@ -61,21 +61,21 @@
 								Leagues</span><br /><br />
 							<ul class="nav flex-column fixturesTextSize footerPart3">
 								<li class="nav-item mb-2"><a
-										href="league/football-predictions-for-england/premier-league-39/fixtures.html"
+										href="league/football-predictions-for-england/premier-league-39/fixtures"
 										class="nav-a p-0 text-light">Football Predictions for England Premier League</a>
 								</li>
 								<li class="nav-item mb-2"><a
-										href="league/football-predictions-for-spain/la-liga-140/fixtures.html"
+										href="league/football-predictions-for-spain/la-liga-140/fixtures"
 										class="nav-a p-0 text-light">Football Predictions for Spain La Liga</a></li>
 								<li class="nav-item mb-2"><a
-										href="league/football-predictions-for-germany/bundesliga-78/fixtures.html"
+										href="league/football-predictions-for-germany/bundesliga-78/fixtures"
 										class="nav-a p-0 text-light">Football Predictions for Germany Bundesliga</a>
 								</li>
 								<li class="nav-item mb-2"><a
-										href="league/football-predictions-for-italy/serie-a-135/fixtures.html"
+										href="league/football-predictions-for-italy/serie-a-135/fixtures"
 										class="nav-a p-0 text-light">Football Predictions for Italy Serie A</a></li>
 								<li class="nav-item mb-2"><a
-										href="league/football-predictions-for-france/ligue-1-61/fixtures.html"
+										href="league/football-predictions-for-france/ligue-1-61/fixtures"
 										class="nav-a p-0 text-light">Football Predictions for France Ligue 1</a></li>
 							</ul>
 						</div>

@@ -138,6 +138,122 @@ class HomeController extends Controller
         ]);
     }
 
+    /**
+     * AJAX endpoint to load more leagues
+     */
+    public function loadMoreLeagues(Request $request)
+    {
+        $date = $request->input('date');
+        $offset = (int) $request->input('offset', 0);
+        $limit = (int) $request->input('limit', 10);
+        $mustWinOnly = $request->input('mustWinOnly', 'false') === 'true';
+        $mixMarkets = $request->input('mixMarkets', 'false') === 'true';
+
+        // Fetch fixtures with their relationships
+        $query = Fixture::with(['league', 'odds'])
+            ->orderBy('date', 'asc');
+
+        if (is_array($date)) {
+            $query->whereBetween('date', $date);
+        } else {
+            $query->whereDate('date', $date);
+        }
+
+        $fixtures = $query->get();
+
+        // Transform fixtures into structured data
+        $data = $fixtures->map(function ($fixture) use ($mixMarkets) {
+            // Parse JSON fields if they're stored as strings
+            $odds = is_array($fixture->odds) ? $fixture->odds : (json_decode($fixture->odds, true) ?? []);
+            $h2h = is_array($fixture->head2head) ? $fixture->head2head : (json_decode($fixture->head2head, true) ?? []);
+            $stats = is_array($fixture->statistics) ? $fixture->statistics : (json_decode($fixture->statistics, true) ?? []);
+            
+            // Get prediction for this fixture
+            if ($mixMarkets) {
+                $predictionOutcome = $this->getBestPrediction($fixture, $odds, $h2h, $stats);
+            } else {
+                $predictionOutcome = $this->predictFixture($fixture, $odds, $h2h, $stats);
+            }
+
+            // Get match winner odds
+            $matchWinnerOdds = $this->getMatchWinnerOdds($fixture, $odds);
+
+            // Calculate average goals from H2H
+            $avgGoals = $this->calculateAverageGoals($h2h);
+
+            return [
+                'fixture_id' => $fixture->fixture_id,
+                'country' => $fixture->league_country ?? 'Unknown',
+                'league' => $fixture->league_name ?? 'Unknown League',
+                'country_flag' => $fixture->league_flag,
+                'league_logo' => $fixture->league_logo,
+                'league_id' => $fixture->league_id,
+                'match_date' => $fixture->date,
+                'match_time' => Carbon::parse($fixture->date)->format('H:i'),
+                'home_team' => $fixture->home_team_name ?? 'N/A',
+                'away_team' => $fixture->away_team_name ?? 'N/A',
+                'home_logo' => $fixture->home_team_logo,
+                'away_logo' => $fixture->away_team_logo,
+                'prediction' => $predictionOutcome['prediction'],
+                'confidence' => $predictionOutcome['confidence'],
+                'prediction_color' => $this->getPredictionColor(
+                        $predictionOutcome['prediction'], 
+                        $predictionOutcome['confidence'], 
+                        $fixture->goals_home, 
+                        $fixture->goals_away
+                    ),
+                'market_name' => $predictionOutcome['market_name'] ?? 'Match Winner',
+                'odds' => $matchWinnerOdds,
+                'avg_goals' => $avgGoals,
+                'status' => $fixture->status_long ?? 'Scheduled',
+                'status_short' => $fixture->status_short ?? 'NS',
+                'home_score' => $fixture->goals_home,
+                'away_score' => $fixture->goals_away,
+                'halftime_home' => $fixture->halftime_home,
+                'halftime_away' => $fixture->halftime_away,
+                'elapsed' => $fixture->elapsed,
+                'venue' => $fixture->venue_name,
+                'is_finished' => in_array($fixture->status_short, ['FT', 'AET', 'PEN']),
+                'has_started' => !in_array($fixture->status_short, ['NS', 'TBD', 'CANC', 'PST']),
+            ];
+        });
+
+        if ($mustWinOnly) {
+            $data = $data->filter(function ($item) {
+                // Must be Home (1) or Away (2) win, and confidence >= 75
+                return in_array($item['prediction'], ['1', '2']) && $item['confidence'] >= 75;
+            })->sortByDesc('confidence');
+        }
+
+        // Group by Country - League for organized display
+        $grouped = $data->groupBy(function ($item) {
+            return $item['country'] . ' - ' . $item['league'];
+        });
+
+        // Get the requested slice of leagues
+        $leagueKeys = $grouped->keys()->slice($offset, $limit);
+        $slicedLeagues = $grouped->only($leagueKeys->toArray());
+
+        // Prepare response
+        $html = '';
+        foreach ($slicedLeagues as $leagueKey => $matches) {
+            $firstMatch = $matches->first();
+            $html .= view('partials.league-section', [
+                'leagueKey' => $leagueKey,
+                'matches' => $matches,
+                'firstMatch' => $firstMatch
+            ])->render();
+        }
+
+        return response()->json([
+            'success' => true,
+            'html' => $html,
+            'hasMore' => ($offset + $limit) < $grouped->count(),
+            'total' => $grouped->count(),
+            'loaded' => $offset + $slicedLeagues->count()
+        ]);
+    }
+
     private function getPredictionsForDate($date, $titlePrefix, $mustWinOnly = false, $viewName = 'home', $mixMarkets = false, $seoData = [])
     {
         // Default SEO data
@@ -221,72 +337,25 @@ class HomeController extends Controller
             })->sortByDesc('confidence');
         }
 
-        $today = Carbon::today()->toDateString();
-
-        // Fetch today's fixtures with their relationships
-        $fixtures = Fixture::with(['league', 'odds'])
-            ->whereDate('date', $today)
-            ->orderBy('date', 'asc')
-            ->get();
-
-        // Transform fixtures into structured data for double chance predictions
-        $data = $fixtures->map(function ($fixture) {
-            // Parse JSON fields if they're stored as strings
-            $odds = is_array($fixture->odds) ? $fixture->odds : (json_decode($fixture->odds, true) ?? []);
-            $h2h = is_array($fixture->head2head) ? $fixture->head2head : (json_decode($fixture->head2head, true) ?? []);
-            $stats = is_array($fixture->statistics) ? $fixture->statistics : (json_decode($fixture->statistics, true) ?? []);
-            
-            // Get double chance specific prediction
-            $doubleChancePrediction = $this->predictDoubleChance($odds, $h2h, $fixture);
-
-            // Get double chance odds instead of match winner odds
-            $doubleChanceOdds = $this->getDoubleChanceOdds($fixture, $odds);
-
-            // Calculate average goals from H2H
-            $avgGoals = $this->calculateAverageGoals($h2h);
-
-            return [
-                'fixture_id' => $fixture->fixture_id,
-                'country' => $fixture->league_country ?? 'Unknown',
-                'league' => $fixture->league_name ?? 'Unknown League',
-                'country_flag' => $fixture->league_flag,
-                'league_logo' => $fixture->league_logo,
-                'league_id' => $fixture->league_id,
-                'match_date' => $fixture->date,
-                'match_time' => Carbon::parse($fixture->date)->format('H:i'),
-                'home_team' => $fixture->home_team_name ?? 'N/A',
-                'away_team' => $fixture->away_team_name ?? 'N/A',
-                'home_logo' => $fixture->home_team_logo,
-                'away_logo' => $fixture->away_team_logo,
-                'prediction' => $doubleChancePrediction['prediction'] ?? 'N/A',
-                'confidence' => $doubleChancePrediction['confidence'] ?? 0,
-                'prediction_color' => $this->getPredictionColor(
-                    $doubleChancePrediction['prediction'] ?? 'N/A', 
-                    $doubleChancePrediction['confidence'] ?? 0,
-                    $fixture->goals_home ?? null,
-                    $fixture->goals_away ?? null
-                ),
-                                'odds' => $doubleChanceOdds,
-                'avg_goals' => $avgGoals,
-                'status' => $fixture->status_long ?? 'Scheduled',
-                'status_short' => $fixture->status_short ?? 'NS',
-                'home_score' => $fixture->goals_home ?? null,
-                'away_score' => $fixture->goals_away ?? null,
-                'halftime_home' => $fixture->halftime_home ?? null,
-                'halftime_away' => $fixture->halftime_away ?? null,
-                'elapsed' => $fixture->elapsed ?? null,
-                'venue' => $fixture->venue_name ?? null,
-                'is_finished' => in_array($fixture->status_short ?? 'NS', ['FT', 'AET', 'PEN']),
-                'has_started' => !in_array($fixture->status_short ?? 'NS', ['NS', 'TBD', 'CANC', 'PST']),
-            ];
-        });
-
         // Group by Country - League for organized display
         $grouped = $data->groupBy(function ($item) {
             return $item['country'] . ' - ' . $item['league'];
         });
 
-        return view('doublechance', ['grouped' => $grouped]);
+        // Pagination metadata
+        $totalLeagues = $grouped->count();
+        $initialLimit = 10;
+
+        return view($viewName, [
+            'grouped' => $grouped,
+            'pageTitle' => $titlePrefix,
+            'seoTitle' => $seoTitle,
+            'seoDescription' => $seoDescription,
+            'seoKeywords' => $seoKeywords,
+            'canonicalUrl' => $canonicalUrl,
+            'totalLeagues' => $totalLeagues,
+            'initialLimit' => $initialLimit,
+        ]);
     }
 
     private function getDoubleChanceOdds($fixture, $odds)
